@@ -48,7 +48,7 @@ dizione/            the English side of the front end (upstream, unmodified)
 config-ko.json      24 kHz · hop 256 · 80 mels · speakers ["KSS"] · vocab_size 142
 ```
 
-`tiny-voca/` and `dizione/` are cloned repositories, recorded here as embedded repositories;
-the Korean work is committed on `tiny-voca` `main`.
+`tiny-voca/` and `dizione/` are vendored as plain files: `tiny-voca/` carries the Korean
+front end on top of upstream, `dizione/` is unmodified.
 
 KSS is licensed **CC BY-NC-SA 4.0** — non-commercial research/testing only.

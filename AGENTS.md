@@ -32,7 +32,7 @@ to g2pk, in one 142-token vocabulary.
 | --- | --- |
 | Hardware | RTX 4090 24 GB (**~18 GB usable**), Ryzen 9 5900X (24 threads), 39.9 GiB RAM |
 | OS / runtime | Windows 11, Python 3.11.16, CUDA 12.6, torch 2.14.1+cu126, transformers 4.57.6, g2pk 0.9.4, faster-whisper, jiwer |
-| Layout | `tiny-voca/` and `dizione/` are editable installs with **uncommitted working-tree changes**; the workspace root is not a git repo |
+| Layout | The workspace root is a git repo (`main` → `github.com/ooodev/korean-tts`); `tiny-voca/` and `dizione/` are vendored as plain files with the Korean work committed in the root repo |
 
 Run everything from the workspace root with the venv interpreter:
 
