@@ -19,26 +19,37 @@ features_smoke/
 features_smoke100/
 features_w/
 
-# Alignments (regenerable from features2 + the front end)
+# Alignments: the full run is committed (32 MB, the exact trainer input); the
+# smoke/probe rounds are regenerable
 annotations/
 annotations_fast/
 annotations_fast2/
-annotations_full/
 annotations_smoke/
 annotations_smoke100/
 
-# Model checkpoints (1.25 GB; runs/full/inference.pt is the artefact people want)
-runs/
+# Model checkpoints: the 83 MB resume checkpoints are excluded, the 17 MB
+# inference graph is not
+runs/*
+!runs/full/
+runs/full/*
+!runs/full/inference.pt
+!runs/full/config.json
+!runs/full/recipe.json
+!runs/full/metrics.jsonl
 
-# Downloaded weights: dizione dictionaries, the aligner, Whisper
-weights/
+# dizione's dictionaries (5 MB, needed by the front end); the aligner and
+# Whisper checkpoints are downloaded on first use
+weights/*
+!weights/phonemizer/
 
-# Stage logs
+# Stage logs: the full training log is committed, the per-stage ones are noise
 logs_*.txt
+!logs_train_full.txt
 
-# Evaluation audio, except the pairs guide.html plays
+# Evaluation audio: the full run and the step-80 000 pre-check
 eval/*
 !eval/full/
 eval/full/*
 !eval/full/audio/
 !eval/full/report.json
+!eval/precheck/
