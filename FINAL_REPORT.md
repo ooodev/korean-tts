@@ -18,6 +18,7 @@ KSS is licensed **CC BY-NC-SA 4.0** — non-commercial research/testing only.
 | Model | 4 549 579 parameters, single speaker `KSS`, **130 000 steps** (GAN from 8 000), 11 h 35 min on an RTX 4090 |
 | Held-out test | **CER 11.8 %** (reference 2.6 %), duration ratio 0.907, pitch spread 6.09 vs 5.78 st, mel DTW 0.778 |
 | Phase 8 samples | 7 files, 24 kHz mono, **mean CER 15.7 %** (8.4 % with numerals folded), 3 transcribed exactly |
+| Browser demo | [ooodev.github.io/korean-tts](https://ooodev.github.io/korean-tts/) — ONNX + Pyodide, 9.7–17× real time in Chrome, no page errors |
 | Total wall clock | **≈ 16.5 h** of the 18 h budget |
 
 ## 1. Files modified
@@ -218,7 +219,24 @@ Reading the numbers honestly:
   unseen at training time and the 30 % CER on that clip reflects the accent of the
   synthesised English, not a front-end failure.
 
-## 8. Reproducing
+## 8. Browser demo
+
+The model runs in the page at **[ooodev.github.io/korean-tts](https://ooodev.github.io/korean-tts/)**
+(`tiny-voca/web/public`, published by `.github/workflows/pages.yml`).
+
+| | |
+| --- | --- |
+| Graph | `runs/full/inference.pt` → `python -m tiny_voca.export` → `model.onnx` 21.4 MB, run by ONNX Runtime Web (WASM, 1 thread) |
+| Parity gate | `scripts/check_onnx.py`: durations exact on 5 sentences, min correlation 0.9824; the `--external-noise` graph reproduces the waveform to a peak of 6.0e-4 |
+| Phonemizer | the same Python as training: `pyfront.zip` = g2pK + jamo + `kofront` (`vocab/text/korean.py`) + dizione, in Pyodide 0.26.4 |
+| Morphology | `python-mecab-ko` has no WASM build → `scripts/mecab_shim.py` (pure Python) + `mecab-dict.json`, the real MeCab analyses of 20 649 training-split eojeols |
+| Shim gate | `scripts/check_shim.py` on held-out validation+test: **92.64 %** identical token stream, **99.80 %** token accuracy |
+| Measured | 4.7 s of audio in 0.28 s (16.9× real time) from Pages, 3.6 s in 0.37 s locally; code-mix renders `ᅩ늘paɪθɑːnᅳ로…`; no page errors |
+| First visit | ~40 MB (28.8 MB assets + Pyodide), then Cache Storage, keyed on `VERSION` in `worker.js` |
+
+Details in `tiny-voca/web/README.md`; the log of the port is `WORKLOG.md` → *Phase 9*.
+
+## 9. Reproducing
 
 ```powershell
 # environment
@@ -241,6 +259,11 @@ powershell -File scripts\train_full.ps1 -Steps 130000 -Output runs\full -Annotat
 .\.venv\Scripts\python.exe scripts\synthesize_samples.py --checkpoint runs\full\inference.pt --manifest samples\manifest.json --outdir samples
 .\.venv\Scripts\python.exe scripts\verify_wavs.py "samples/*.wav"
 .\.venv\Scripts\python.exe scripts\asr_check.py --manifest samples\manifest.json --outdir samples --model small --device cuda
+# 6. browser demo assets, then serve tiny-voca\web\public (or push: Pages publishes it)
+.\.venv\Scripts\python.exe scripts\build_mecab_dict.py
+.\.venv\Scripts\python.exe scripts\build_web_assets.py --export
+.\.venv\Scripts\python.exe scripts\check_onnx.py
+.\.venv\Scripts\python.exe scripts\check_shim.py --sentences 644
 ```
 
 Every command needs `TINY_VOCA_FRONTEND=ko` and `DIZIONE_DATA=<workspace>/weights/phonemizer`;

@@ -13,8 +13,14 @@ on [`Bingsu/KSS_Dataset`](https://huggingface.co/datasets/Bingsu/KSS_Dataset) on
 | Model | 4 549 579 parameters, 130 000 steps (GAN from 8 000), 11 h 35 min on an RTX 4090 |
 | Held-out test | **CER 11.8 %** (recorded reference 2.6 %), duration ratio 0.907, pitch spread 6.09 vs 5.78 st |
 | Samples | 7 utterances, **mean CER 15.7 %** (8.4 % with numerals folded), 3 transcribed exactly |
+| Demo | [**Browser demo**](https://ooodev.github.io/korean-tts/) — the model runs in the page (ONNX + Pyodide), nothing leaves the device |
 
 ## Try it
+
+In the browser: **[ooodev.github.io/korean-tts](https://ooodev.github.io/korean-tts/)** —
+type a sentence, press 합성. About 40 MB downloads once; a second visit starts from cache.
+
+From the command line:
 
 ```powershell
 $env:PYTHONUTF8="1"; $env:TINY_VOCA_FRONTEND="ko"
@@ -35,6 +41,7 @@ $env:DIZIONE_DATA="C:\ai-workspace\korean-tts\weights\phonemizer"
 | [`FINAL_REPORT.md`](FINAL_REPORT.md) | full results: files changed, vocab, aligner, training, evaluation, samples |
 | [`WORKLOG.md`](WORKLOG.md) | the running log: every gate output, command, timing and decision |
 | [`guide.html`](guide.html) | the guide as a page with inline audio players |
+| [`tiny-voca/web/README.md`](tiny-voca/web/README.md) | the browser demo: how it loads the model, the assets, the gates, deploying it |
 
 ## Layout
 
@@ -46,6 +53,7 @@ weights/phonemizer/ dizione's English dictionaries
 eval/full/          report.json + generated/reference audio pairs
 scripts/            workspace helpers (prepare, split, merge, train driver, checks)
 tiny-voca/          the model, with the Korean front end
+  web/public/       the browser demo: page, worker, and the assets Pages serves
 dizione/            the English side of the front end (upstream, unmodified)
 config-ko.json      24 kHz · hop 256 · 80 mels · speakers ["KSS"] · vocab_size 142
 ```
@@ -53,7 +61,7 @@ config-ko.json      24 kHz · hop 256 · 80 mels · speakers ["KSS"] · vocab_si
 `tiny-voca/` and `dizione/` are vendored as plain files: `tiny-voca/` carries the Korean
 front end on top of upstream, `dizione/` is unmodified.
 
-The repository is 75 MB and every file is under 25 MB, so no Git LFS is needed. The large
+The repository is 102 MB and every file is under 25 MB, so no Git LFS is needed. The large
 regenerable layers are the ones a clone does not carry: `data/` (1.9 GB Parquet),
 `features2/` (5.7 GB acoustic features) and the 83 MB resume checkpoints `runs/full/last.pt`
 and `step-*.pt`. `weights/` also holds the 1.2 GB aligner and Whisper checkpoints, which are

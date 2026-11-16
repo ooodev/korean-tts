@@ -674,3 +674,101 @@ audio, so the dizione phones are unseen at training time.
 
 **Session total**: 01:10 → 17:40 ≈ **16.5 h** of the 18 h budget (prepare 2 h single +
 22 min parallel, annotate 8 min, train 11 h 35 min, evaluate + samples + ASR ~10 min).
+
+## Phase 9 — browser demo (Korean) — 16:20 → 17:10
+
+Goal: port `tiny-voca/web` (upstream's English demo) to the Korean model, so the
+130 000-step checkpoint runs in the browser and the repository publishes it.
+
+### Export the graph — 21.4 MB, 40 s
+
+```powershell
+.\.venv\Scripts\python.exe -m tiny_voca.export --checkpoint runs\full\inference.pt `
+  --output tiny-voca\web\public\assets\model.onnx            # 21.4 MB + model.json
+.\.venv\Scripts\python.exe -m tiny_voca.export --checkpoint runs\full\inference.pt `
+  --output runs\full\model-noise.onnx --external-noise        # for the exact check
+```
+
+`scripts/check_onnx.py` compares the graph with the torch model on 5 sentences
+(including the code-mixed one). The shipped graph generates its own noise for the
+source-filter head, so its waveform is a *different realisation of the same voice*:
+durations must match exactly, the waveform only correlates.
+
+| sentence | tokens | seconds | durations | correlation | peak |
+| --- | --- | --- | --- | --- | --- |
+| greeting | 47 | 4.11 | exact | 0.9937 | 0.138 |
+| question | 44 | 3.67 | exact | 0.9824 | 0.163 |
+| numbers | 61 | 4.70 | exact | 0.9876 | 0.218 |
+| code-mix | 43 | 3.61 | exact | 0.9927 | 0.259 |
+| exclamation | 63 | 5.97 | exact | 0.9938 | 0.153 |
+
+**Gate**: durations exact on all 5, min correlation 0.9824, and the
+`--external-noise` graph fed the torch noise stream reproduces the waveform to a
+peak of **6.0e-4** (float32 conv accumulation, ≈ −64 dB). That second graph is what
+proves the export is faithful rather than merely similar.
+
+### Morphology in Pyodide — the one real porting problem
+
+g2pK calls `python-mecab-ko` for POS tags; it is a native extension with no WASM
+build. `scripts/mecab_shim.py` implements `.pos()` in pure Python (particle /
+sentence-ending / bound-noun / suffix peeling — g2pK only reads
+`tag.split("+")[-1][0]`, so the coarse class is all that matters). Tables alone
+reach 88 %; the fix that mattered was the **corpus dictionary**:
+`scripts/build_mecab_dict.py` records the real MeCab analysis of every eojeol in the
+12 210 *training* sentences (20 649 eojeols, 0.95 MB), so the browser reproduces the
+front end the model was trained on wherever the corpus has the word.
+
+`scripts/check_shim.py --sentences 644` on the held-out splits (dictionary built
+from train only, so this measures real coverage):
+
+| measure | value |
+| --- | --- |
+| every eojeol in the dictionary | 26.2 % of sentences |
+| **identical token stream** | **92.64 %** (428/462) |
+| **token accuracy** | **99.80 %** (34 of 17 281 tokens) |
+| mean edit | 0.07 tokens per sentence |
+
+Residual diffs are one tensification or liaison token (`ᄀ`→`ᄁ`, `ᄉ`→`ᄊ`, `ᄄ`→`ᄃ`)
+where the shim draws the stem boundary at a slightly different place than MeCab.
+Gate set at 90 % identical; passes.
+
+### Assets — 28.8 MB, `scripts/build_web_assets.py`
+
+`model.onnx` 21.4 MB · `phonemizer/` 6.3 MB (dizione's built files + NLTK
+`cmudict.zip`) · `mecab-dict.json` 0.95 MB · `pyfront.zip` (g2pK + jamo +
+`kofront` = the *same* `vocab/text/korean.py` + the shim as `mecab.py`) ·
+`dizione.zip`. They are committed to git so GitHub Pages needs no build step;
+`tiny-voca/.gitignore` un-ignores `web/public/assets/` and `model.onnx`.
+
+### Page
+
+`web/public/index.html` (Korean: 6 example chips incl. 한영 혼용, 빠르기/음높이
+sliders, 지표, 자모 보기) + a rewritten `worker.js` (Pyodide 0.26.4 + ONNX Runtime
+Web 1.20.1, Cache Storage keyed on `VERSION`). The upstream English page stays as
+`en.html` / `worker-en.js`.
+
+### Measured in headless Chrome
+
+| | local server | GitHub Pages |
+| --- | --- | --- |
+| audio | 3.6 s (code-mix) | 4.7 s (numbers) |
+| synthesis wall clock | 0.37 s → 9.7× real time | 0.28 s → 16.9× real time |
+| phonemization | 186 ms | 29 ms (warm) |
+| page errors | none | none |
+
+The code-mix sentence renders `ᅩ늘paɪθɑːnᅳ로…` — dizione for `Python`, Jamo for the
+Korean around it, exactly as in training.
+
+### Deploy
+
+`.github/workflows/pages.yml` publishes `tiny-voca/web/public`. First run failed:
+`configure-pages` could not create the site (free plan + private repo). Made the repo
+public and added `enablement: true`; run 43852256917 succeeded →
+**https://ooodev.github.io/korean-tts/**.
+
+**Decision log**: two ONNX graphs instead of one (a single graph cannot show both that
+durations are exact and that the waveform is reproduced); corpus dictionary instead of
+a bigger rule table (rules plateau at ~90 %, the dictionary is 0.95 MB and exact where
+it applies); assets in git instead of a Pages build step (a build would need PyTorch on
+the runner for every docs-only commit).
+

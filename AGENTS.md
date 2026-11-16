@@ -60,6 +60,14 @@ fragments the caching allocator otherwise).
   driver log mixes both — `scripts/parse_train_log.py` decodes UTF-8 and drops NULs.
 - `array -ge scalar` in PowerShell returns an array (always truthy). Cast scalars
   explicitly; this silently ended a training chunk loop early.
+- **Demo assets are cached by `VERSION` in `web/public/worker.js`** (Cache Storage key
+  `tiny-voca-ko-<VERSION>`). Change anything under `assets/` and bump it, or browsers keep
+  the old model.
+- GitHub Pages on the free plan needs the repo **public**; `actions/configure-pages` needs
+  `enablement: true` to create the site on the first run.
+- `scripts/check_shim.py` reads the dictionary the page ships, so set `MECAB_DICT` to
+  `tiny-voca\web\public\assets\mecab-dict.json`; without it the shim runs on its tables
+  alone and scores ~90 %.
 
 ## Pipeline, in order
 
@@ -73,8 +81,10 @@ fragments the caching allocator otherwise).
 | 6 | Train | `powershell -File scripts/train_full.ps1 -Steps 130000` | 11 h 35 m |
 | 7 | Evaluate | `python -m tiny_voca.evaluate --checkpoint runs/full/inference.pt …` | 16 s |
 | 8 | Samples + gates | `scripts/synthesize_samples.py`, `verify_wavs.py`, `asr_check.py` | ~1 min |
+| 9 | Browser demo assets | `scripts/build_mecab_dict.py` then `scripts/build_web_assets.py` (`--export` to re-export ONNX) | ~4 min |
 
-Full flag sets are in `DATASET.md` and `TRAIN.md`.
+Full flag sets are in `DATASET.md` and `TRAIN.md`. Stage 9 needs
+`TINY_VOCA_FRONTEND=ko` and `DIZIONE_DATA` set, like every other stage.
 
 ## Source layout you will touch
 
@@ -87,6 +97,8 @@ Full flag sets are in `DATASET.md` and `TRAIN.md`.
 | `tiny-voca/src/tiny_voca/annotate.py` | picks `kalign` for `ko`, persists/restores `units`, QC gates |
 | `tiny-voca/src/tiny_voca/evaluate.py` | Korean-aware ASR (`ko`/`small`), CER next to WER |
 | `config-ko.json` | 24 kHz, hop 256, n_fft 1024, 80 mels, F0 50–600, `speakers ["KSS"]`, `vocab_size 142` |
+| `tiny-voca/web/public/` | the browser demo: `index.html` (Korean) + `worker.js` (Pyodide + ONNX Runtime Web), `en.html`/`worker-en.js` are the upstream English page |
+| `scripts/mecab_shim.py` | pure-Python `python-mecab-ko` stand-in for Pyodide; reads `mecab-dict.json` (`MECAB_DICT` env var) |
 | `scripts/*` | workspace helpers (see `GUIDE.md` for the full list) |
 
 ## Identity / staleness rules (these cause the confusing errors)
@@ -114,6 +126,9 @@ cd ..
 .\.venv\Scripts\python.exe scripts\check_guide.py         # guide.html placeholders + audio paths
 .\.venv\Scripts\python.exe scripts\parse_train_log.py logs_train_full.txt --every 10000 --validation
 .\.venv\Scripts\python.exe scripts\checkpoint_probe.py --run runs/full   # per-checkpoint listening set
+.\.venv\Scripts\python.exe scripts\check_onnx.py           # ONNX graph == torch model (demo)
+$env:MECAB_DICT="C:\ai-workspace\korean-tts\tiny-voca\web\public\assets\mecab-dict.json"
+.\.venv\Scripts\python.exe scripts\check_shim.py --sentences 644   # shim == MeCab, held-out splits
 ```
 
 ## Phase status
@@ -128,3 +143,4 @@ cd ..
 | 6 Smoke | ✅ | 100 clips, 800 steps in 86 s, valid wavs |
 | 7 Full prepare/annotate/train | ✅ | 8 504 clips aligned, 130 000 steps, no NaN |
 | 8 Samples & quality | ✅ | 7 wavs, mean CER 15.7 % (8.4 % numerals folded) |
+| 9 Browser demo | ✅ | ONNX parity (durations exact, corr ≥ 0.982), shim 92.6 % identical / 99.80 % tokens, live at ooodev.github.io/korean-tts |
