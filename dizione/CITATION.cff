@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use dizione, please cite it as below."
+title: "dizione: English text to phonemes"
+type: software
+authors:
+  - given-names: Muhammed
+    family-names: Nazeem
+    orcid: "https://orcid.org/0009-0002-9991-0217"
+year: 2026
+license: Apache-2.0

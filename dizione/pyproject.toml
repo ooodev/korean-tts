@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dizione"
+version = "0.1.0"
+description = "English text to phonemes: dictionary, small model for unknown words, and text rules"
+readme = "README.md"
+authors = [{ name = "Muhammed Nazeem" }]
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24,<3"]
+
+[project.optional-dependencies]
+# Only for rebuilding the data from CMUdict.
+build = ["torch>=2.4,<3", "scipy>=1.10,<2", "scikit-learn>=1.3,<2"]
+
+[project.scripts]
+dizione = "dizione.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+dizione = ["data/*.txt", "built/*"]
