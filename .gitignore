@@ -1,0 +1,44 @@
+# Environment
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Data: 24 kHz Parquet shards (1.8 GB) and the shard parts used for parallel prepare
+data/
+data_fast/
+data_smoke/
+data_smoke100/
+data_parts/
+
+# Acoustic features (5.5 GB of .pt files)
+features/
+features2/
+features_fast/
+features_smoke/
+features_smoke100/
+features_w/
+
+# Alignments (regenerable from features2 + the front end)
+annotations/
+annotations_fast/
+annotations_fast2/
+annotations_full/
+annotations_smoke/
+annotations_smoke100/
+
+# Model checkpoints (1.25 GB; runs/full/inference.pt is the artefact people want)
+runs/
+
+# Downloaded weights: dizione dictionaries, the aligner, Whisper
+weights/
+
+# Stage logs
+logs_*.txt
+
+# Evaluation audio, except the pairs guide.html plays
+eval/*
+!eval/full/
+eval/full/*
+!eval/full/audio/
+!eval/full/report.json

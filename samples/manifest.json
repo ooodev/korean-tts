@@ -1,0 +1,30 @@
+[
+  {
+    "name": "sample_01_greeting",
+    "text": "안녕하세요. 오늘 날씨가 정말 맑고 좋네요."
+  },
+  {
+    "name": "sample_02_question",
+    "text": "지금 몇 시인지 혹시 알려주실 수 있나요?"
+  },
+  {
+    "name": "sample_03_phonology",
+    "text": "국물 맛이 끝내주고 신라의 역사도 흥미롭습니다."
+  },
+  {
+    "name": "sample_04_numbers",
+    "text": "이천이십육 년 십일 월 십오 일 오후 세 시 삼십 분입니다."
+  },
+  {
+    "name": "sample_05_long",
+    "text": "저는 보통 이십 분 정도 낮잠을 자고 나면 오후 업무에 훨씬 더 집중할 수 있습니다."
+  },
+  {
+    "name": "sample_06_exclamation",
+    "text": "와, 정말 대단하네요! 드디어 한국어 음성 합성에 성공했습니다!"
+  },
+  {
+    "name": "sample_07_codemix_check",
+    "text": "오늘 Python으로 테스트를 진행했습니다."
+  }
+]

@@ -1,0 +1,65 @@
+[
+  {
+    "name": "sample_01_greeting",
+    "wav": "samples\\sample_01_greeting.wav",
+    "reference": "안녕하세요 오늘 날씨가 정말 맑고 좋네요",
+    "hypothesis": "안녕하세요 오늘 날씨가 정말 맑고 좋네요",
+    "cer": 0.0,
+    "wer": 0.0,
+    "cer_numbers_folded": 0.0
+  },
+  {
+    "name": "sample_02_question",
+    "wav": "samples\\sample_02_question.wav",
+    "reference": "지금 몇 시인지 혹시 알려주실 수 있나요",
+    "hypothesis": "지금 몇 시인지 혹시 알려주실 수 있나요",
+    "cer": 0.0,
+    "wer": 0.0,
+    "cer_numbers_folded": 0.0
+  },
+  {
+    "name": "sample_03_phonology",
+    "wav": "samples\\sample_03_phonology.wav",
+    "reference": "국물 맛이 끝내주고 신라의 역사도 흥미롭습니다",
+    "hypothesis": "국물맛이 끝내주고 슬라이 역사도 흥미롭습니다",
+    "cer": 0.1,
+    "wer": 0.5,
+    "cer_numbers_folded": 0.1
+  },
+  {
+    "name": "sample_04_numbers",
+    "wav": "samples\\sample_04_numbers.wav",
+    "reference": "이천이십육 년 십일 월 십오 일 오후 세 시 삼십 분입니다",
+    "hypothesis": "2026년 11월 15일 오후 3시 30분입니다",
+    "cer": 0.5454545454545454,
+    "wer": 0.9090909090909091,
+    "cer_numbers_folded": 0.125
+  },
+  {
+    "name": "sample_05_long",
+    "wav": "samples\\sample_05_long.wav",
+    "reference": "저는 보통 이십 분 정도 낮잠을 자고 나면 오후 업무에 훨씬 더 집중할 수 있습니다",
+    "hypothesis": "저는 보통 20분 정도 낮잠을 자고 나면 5움무에 훨씬 더 집중할 수 있습니다",
+    "cer": 0.15625,
+    "wer": 0.26666666666666666,
+    "cer_numbers_folded": 0.06451612903225806
+  },
+  {
+    "name": "sample_06_exclamation",
+    "wav": "samples\\sample_06_exclamation.wav",
+    "reference": "와 정말 대단하네요 드디어 한국어 음성 합성에 성공했습니다",
+    "hypothesis": "와 정말 대단하네요 드디어 한국어 음성 합성에 성공했습니다",
+    "cer": 0.0,
+    "wer": 0.0,
+    "cer_numbers_folded": 0.0
+  },
+  {
+    "name": "sample_07_codemix_check",
+    "wav": "samples\\sample_07_codemix_check.wav",
+    "reference": "오늘 Python으로 테스트를 진행했습니다",
+    "hypothesis": "오늘 역할용으로 테스트를 진행했습니다",
+    "cer": 0.3,
+    "wer": 0.25,
+    "cer_numbers_folded": 0.3
+  }
+]
