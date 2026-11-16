@@ -174,8 +174,8 @@ model's own floor.
 ## 7. Fresh environment
 
 ```powershell
-git clone https://github.com/n4ze3m/tiny-voca.git
-git clone https://github.com/n4ze3m/dizione.git
+git clone https://github.com/ooodev/korean-tts.git   # carries tiny-voca/ and dizione/
+cd korean-tts
 uv venv .venv --python 3.11
 $env:VIRTUAL_ENV="C:\ai-workspace\korean-tts\.venv"
 uv pip install -e ./dizione -e ./tiny-voca torch --index-url https://download.pytorch.org/whl/cu126
@@ -185,7 +185,11 @@ uv pip install datasets pyarrow soundfile librosa torchaudio scipy g2pk transfor
 .\.venv\Scripts\python.exe -c "from g2pk import G2p; print(G2p()('맑은 날씨가 좋아요.'))"   # 말근 날씨가 조아요.
 ```
 
-Then follow the eight stages in `AGENTS.md`, or the reproduce block in `FINAL_REPORT.md`.
+`weights/phonemizer/` (dizione's `lexicon.tsv` + `g2p.npz`) is in the clone, so
+`DIZIONE_DATA` works straight away; the aligner and Whisper checkpoints download on first
+use. With the clone you can synthesise immediately — `runs/full/inference.pt` is committed.
+To retrain, follow the eight stages in `AGENTS.md`, or the reproduce block in
+`FINAL_REPORT.md`; `data/` and `features2/` are the layers you have to rebuild.
 
 ## 8. Known limits
 

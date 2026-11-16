@@ -40,15 +40,23 @@ $env:DIZIONE_DATA="C:\ai-workspace\korean-tts\weights\phonemizer"
 
 ```
 samples/            final 24 kHz audio (7 utterances) + token and ASR tables
-runs/full/          checkpoints — inference.pt is the model
+runs/full/          inference.pt is the model; config, recipe, metrics.jsonl
+annotations_full/   the aligned clips the trainer read (32 MB)
+weights/phonemizer/ dizione's English dictionaries
 eval/full/          report.json + generated/reference audio pairs
 scripts/            workspace helpers (prepare, split, merge, train driver, checks)
-tiny-voca/          the model, with the Korean front end (branch main, local commit)
+tiny-voca/          the model, with the Korean front end
 dizione/            the English side of the front end (upstream, unmodified)
 config-ko.json      24 kHz · hop 256 · 80 mels · speakers ["KSS"] · vocab_size 142
 ```
 
 `tiny-voca/` and `dizione/` are vendored as plain files: `tiny-voca/` carries the Korean
 front end on top of upstream, `dizione/` is unmodified.
+
+The repository is 75 MB and every file is under 25 MB, so no Git LFS is needed. The large
+regenerable layers are the ones a clone does not carry: `data/` (1.9 GB Parquet),
+`features2/` (5.7 GB acoustic features) and the 83 MB resume checkpoints `runs/full/last.pt`
+and `step-*.pt`. `weights/` also holds the 1.2 GB aligner and Whisper checkpoints, which are
+downloaded on first use.
 
 KSS is licensed **CC BY-NC-SA 4.0** — non-commercial research/testing only.
