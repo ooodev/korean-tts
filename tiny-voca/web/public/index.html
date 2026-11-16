@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>tiny-voca</title>
-<meta name="description" content="tiny-voca is a 4.5M-parameter English text-to-speech model. This page runs it in your browser.">
+<title>tiny-voca 한국어</title>
+<meta name="description" content="4.5M 파라미터 한국어 TTS 모델. 이 페이지는 브라우저에서 바로 합성합니다.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23171512'/%3E%3Cpath d='M8 13v6M12 9v14M16 12v8M20 7v18M24 13v6' stroke='%23f4efe6' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
   :root {
@@ -12,33 +12,30 @@
     --accent: #b4421f; --accent-ink: #fff; --ok: #2f6b3c;
     --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     --sans: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-    --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --ui: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root { --paper: #151412; --ink: #ece6da; --muted: #9a9284; --line: #35312a; --panel: #1d1b18; --accent: #e0703f; --accent-ink: #151412; --ok: #7fbf8c; }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.55 var(--ui); }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 var(--ui); }
   main { max-width: 760px; margin: 0 auto; padding: 56px 20px 72px; }
-  header h1 { font: 600 44px/1.05 var(--sans); letter-spacing: -0.01em; margin: 0 0 14px; }
+  header h1 { font: 600 42px/1.1 var(--sans); letter-spacing: -0.01em; margin: 0 0 14px; }
+  header h1 span { font-family: var(--ui); font-size: 30px; font-weight: 700; }
   header p { margin: 0; color: var(--muted); max-width: 56ch; }
   header p strong { color: var(--ink); font-weight: 600; }
   .panel { margin-top: 36px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
-  textarea { width: 100%; min-height: 150px; resize: vertical; border: 0; outline: 0; background: transparent; color: inherit;
-             font: 20px/1.5 var(--sans); padding: 4px; }
+  textarea { width: 100%; min-height: 130px; resize: vertical; border: 0; outline: 0; background: transparent; color: inherit;
+             font: 20px/1.55 var(--ui); padding: 4px; }
   .examples { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 2px; }
   .examples button { font: 13px var(--ui); color: var(--muted); background: transparent; border: 1px solid var(--line);
                      border-radius: 999px; padding: 5px 11px; cursor: pointer; }
   .examples button:hover { color: var(--ink); border-color: var(--muted); }
   .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; border-top: 1px solid var(--line); margin-top: 14px; padding-top: 14px; }
-  .voices { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
-  .voices label { padding: 7px 14px; font-size: 14px; cursor: pointer; color: var(--muted); }
-  .voices input { position: absolute; opacity: 0; pointer-events: none; }
-  .voices input:checked + span { color: var(--ink); font-weight: 600; }
-  .voices label:has(input:checked) { background: var(--paper); }
-  .voices label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .voice { font-size: 14px; color: var(--muted); border: 1px solid var(--line); border-radius: 9px; padding: 6px 12px; }
+  .voice b { color: var(--ink); }
   .speed { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
-  .speed input { width: 130px; accent-color: var(--accent); }
+  .speed input { width: 110px; accent-color: var(--accent); }
   .speed output { font: 13px var(--mono); color: var(--ink); min-width: 4ch; }
   #speak { margin-left: auto; font: 600 16px var(--ui); color: var(--accent-ink); background: var(--accent); border: 0;
            border-radius: 10px; padding: 11px 22px; cursor: pointer; }
@@ -56,16 +53,16 @@
   dt { font-size: 12px; color: var(--muted); }
   dd { margin: 2px 0 0; font: 15px var(--mono); }
   details { margin-top: 16px; font-size: 14px; color: var(--muted); }
-  details pre { white-space: pre-wrap; word-break: break-word; font: 13px/1.6 var(--mono); color: var(--ink); margin: 8px 0 0; }
+  details pre { white-space: pre-wrap; word-break: break-word; font: 14px/1.7 var(--mono); color: var(--ink); margin: 8px 0 0; }
   .facts { margin-top: 44px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 1px solid var(--line); }
   .facts div { padding: 16px 12px 16px 0; border-bottom: 1px solid var(--line); }
-  .facts b { display: block; font: 600 22px var(--sans); }
+  .facts b { display: block; font: 600 21px var(--sans); }
   .facts span { font-size: 13px; color: var(--muted); }
   footer { margin-top: 36px; font-size: 14px; color: var(--muted); }
   footer a { color: var(--ink); text-underline-offset: 3px; margin-right: 16px; }
   footer p { margin: 14px 0 0; max-width: 62ch; }
   @media (max-width: 560px) {
-    header h1 { font-size: 34px; } main { padding-top: 36px; }
+    header h1 { font-size: 32px; } header h1 span { font-size: 24px; } main { padding-top: 36px; }
     dl { grid-template-columns: repeat(2, 1fr); } .facts { grid-template-columns: repeat(2, 1fr); }
     #speak { margin-left: 0; width: 100%; }
   }
@@ -74,64 +71,67 @@
 <body>
 <main>
   <header>
-    <h1>tiny-voca</h1>
-    <p>A <strong>4.5M-parameter</strong> English text-to-speech model with two voices, trained from scratch.
-       This page runs it in your browser: nothing you type leaves your device.</p>
+    <h1>tiny-voca <span>한국어</span></h1>
+    <p><strong>450만 파라미터</strong> 한국어 TTS 모델입니다. 영문이 섞인 문장은 영어 그대로,
+       한국어는 g2pk 음운 규칙으로 읽습니다. 이 페이지는 모델을 브라우저에서 직접 돌리므로
+       입력한 텍스트가 기기 밖으로 나가지 않습니다.</p>
   </header>
 
   <section class="panel">
-    <textarea id="text" spellcheck="false" aria-label="Text to speak">Hello! This is tiny voca, a small text to speech model running entirely in your browser.</textarea>
+    <textarea id="text" spellcheck="false" aria-label="합성할 문장">안녕하세요. 오늘 날씨가 정말 맑고 좋네요.</textarea>
     <div class="examples" id="examples"></div>
     <div class="controls">
-      <div class="voices" role="radiogroup" aria-label="Voice">
-        <label><input type="radio" name="voice" value="0" checked><span>F2</span></label>
-        <label><input type="radio" name="voice" value="1"><span>M2</span></label>
-      </div>
-      <label class="speed">Speed <input id="speed" type="range" min="0.7" max="1.4" step="0.05" value="1"><output id="speed-value">1.00</output></label>
-      <button id="speak" disabled>Speak</button>
+      <span class="voice">음성 <b>KSS</b></span>
+      <label class="speed">빠르기 <input id="speed" type="range" min="0.7" max="1.4" step="0.05" value="1"><output id="speed-value">1.00</output></label>
+      <label class="speed">음높이 <input id="pitch" type="range" min="-0.12" max="0.12" step="0.01" value="0"><output id="pitch-value">0.00</output></label>
+      <button id="speak" disabled>합성</button>
     </div>
   </section>
 
-  <div class="status" id="status" role="status">Loading…</div>
+  <div class="status" id="status" role="status">불러오는 중…</div>
   <div class="bar" id="bar"><i></i></div>
 
   <section class="result" id="result" hidden>
     <audio id="audio" controls></audio>
     <dl>
-      <div><dt>Audio</dt><dd id="m-audio">–</dd></div>
-      <div><dt>Time to generate</dt><dd id="m-time">–</dd></div>
-      <div><dt>Speed</dt><dd id="m-speed">–</dd></div>
-      <div><dt>Text to phonemes</dt><dd id="m-phonemes">–</dd></div>
+      <div><dt>오디오</dt><dd id="m-audio">–</dd></div>
+      <div><dt>합성 시간</dt><dd id="m-time">–</dd></div>
+      <div><dt>속도</dt><dd id="m-speed">–</dd></div>
+      <div><dt>음소 분석</dt><dd id="m-phonemes">–</dd></div>
     </dl>
-    <details><summary>Phonemes</summary><pre id="phonemes"></pre></details>
+    <details><summary>음소 (자모)</summary><pre id="phonemes"></pre></details>
   </section>
 
   <section class="facts">
-    <div><b>4,537,291</b><span>parameters, waveform generator included</span></div>
-    <div><b>21 MB</b><span>model file (ONNX, float32)</span></div>
-    <div><b>24 kHz</b><span>mono output</span></div>
-    <div><b>2 voices</b><span>F2 and M2, American English</span></div>
-    <div><b>17.6 hours</b><span>of synthetic training speech</span></div>
-    <div><b>Apache-2.0</b><span>code and weights</span></div>
+    <div><b>4,549,579</b><span>파라미터, 파형 생성기 포함</span></div>
+    <div><b>21.4 MB</b><span>모델 파일 (ONNX, float32)</span></div>
+    <div><b>24 kHz</b><span>모노 출력</span></div>
+    <div><b>8.45 시간</b><span>정렬된 한국어 발화 (KSS)</span></div>
+    <div><b>130,000</b><span>학습 스텝, RTX 4090 11시간 35분</span></div>
+    <div><b>CER 11.8 %</b><span>보유 검증 세트 (원음 2.6 %)</span></div>
   </section>
 
   <footer>
-    <a href="https://github.com/n4ze3m/tiny-voca">Code</a>
-    <a href="https://huggingface.co/n4ze3m/tiny-voca">Weights</a>
-    <a href="https://huggingface.co/datasets/n4ze3m/tiny-voca">Dataset</a>
-    <a href="https://github.com/n4ze3m/dizione">Phonemizer</a>
-    <p>The first visit downloads about 40 MB: the model, the pronunciation dictionary and a Python runtime for the
-       phonemizer. English only. Foreign names and unusual spellings are often mispronounced.</p>
+    <a href="https://github.com/ooodev/korean-tts">코드와 문서</a>
+    <a href="https://github.com/n4ze3m/tiny-voca">tiny-voca</a>
+    <a href="https://github.com/n4ze3m/dizione">dizione</a>
+    <a href="https://huggingface.co/datasets/Bingsu/KSS_Dataset">KSS</a>
+    <a href="en.html">English demo</a>
+    <p>첫 방문 시 약 40 MB를 받습니다: 모델, 발음 사전, Python 런타임(Pyodide). 한국어와 영어
+       혼용 문장을 읽지만, KSS에 영어 발화가 없어 영어 음성은 학습되지 않았습니다. 형태 분석은
+       코퍼스에서 뽑은 사전으로 MeCab를 대체하므로, 사전에 없는 단어에서 음운 규칙 하나가
+       달라질 수 있습니다(문장당 토큰 99.8 % 일치). KSS는 CC BY-NC-SA 4.0입니다.</p>
   </footer>
 </main>
 
 <script>
 const EXAMPLES = [
-  ["Greeting", "Hello! This is tiny voca, a small text to speech model running entirely in your browser."],
-  ["Numbers", "The meeting moved to 3:30 pm on March 14th, so we have about 45 minutes left. It costs $12.99."],
-  ["Question", "Did you really think I would forget your birthday? Of course not!"],
-  ["Story", "She had never seen the sea before, and for a long while she stood at the edge of the water without saying a word."],
-  ["Homographs", "I read the book you read yesterday. They live near the live music hall."],
+  ["인사", "안녕하세요. 오늘 날씨가 정말 맑고 좋네요."],
+  ["질문", "지금 몇 시인지 혹시 알려주실 수 있나요?"],
+  ["숫자", "이천이십육 년 십일 월 십오 일 오후 세 시 삼십 분입니다."],
+  ["음운 규칙", "국물 맛이 끝내주고 신라의 역사도 흥미롭습니다."],
+  ["감탄", "와, 정말 대단하네요! 드디어 한국어 합성에 성공했습니다!"],
+  ["한영 혼용", "오늘 Python으로 테스트를 진행했습니다."],
 ];
 const $ = (id) => document.getElementById(id);
 const worker = new Worker("worker.js");
@@ -144,6 +144,7 @@ for (const [label, text] of EXAMPLES) {
   $("examples").append(button);
 }
 $("speed").oninput = () => { $("speed-value").textContent = Number($("speed").value).toFixed(2); };
+$("pitch").oninput = () => { $("pitch-value").textContent = Number($("pitch").value).toFixed(2); };
 
 function setStatus(text, progress) {
   $("status").textContent = text;
@@ -168,10 +169,10 @@ function wav(samples, rate) {
 let phonemes = [];
 worker.onmessage = ({ data }) => {
   if (data.type === "status") setStatus(data.text, data.progress);
-  else if (data.type === "ready") { ready = true; setStatus("Ready."); update(); }
+  else if (data.type === "ready") { ready = true; setStatus(`준비 완료 — 스텝 ${data.step}.`); update(); }
   else if (data.type === "sentence" && data.id === request) {
     phonemes.push(data.phonemes);
-    setStatus(`Speaking sentence ${data.index + 1} of ${data.total}`, (data.index + 1) / data.total);
+    setStatus(`${data.total}문장 중 ${data.index + 1}번 합성`, (data.index + 1) / data.total);
   } else if (data.type === "done" && data.id === request) {
     busy = false; update();
     const seconds = data.audio.length / data.sampleRate;
@@ -179,32 +180,32 @@ worker.onmessage = ({ data }) => {
     url = URL.createObjectURL(wav(data.audio, data.sampleRate));
     $("audio").src = url;
     $("audio").play().catch(() => {});
-    $("m-audio").textContent = seconds.toFixed(1) + " s";
-    $("m-time").textContent = (data.totalTime / 1000).toFixed(2) + " s";
-    $("m-speed").textContent = (seconds / (data.totalTime / 1000)).toFixed(1) + "× real time";
-    $("m-phonemes").textContent = Math.round(data.phonemeTime) + " ms";
+    $("m-audio").textContent = seconds.toFixed(1) + "초";
+    $("m-time").textContent = (data.totalTime / 1000).toFixed(2) + "초";
+    $("m-speed").textContent = (seconds / (data.totalTime / 1000)).toFixed(1) + "배 실시간";
+    $("m-phonemes").textContent = Math.round(data.phonemeTime) + "ms";
     $("phonemes").textContent = phonemes.join("\n");
     $("result").hidden = false;
-    setStatus("Done.");
+    setStatus("완료.");
   } else if (data.type === "error") {
     busy = false; update();
-    setStatus("Something went wrong: " + data.message);
+    setStatus("문제가 발생했습니다: " + data.message);
   }
 };
-worker.onerror = (event) => setStatus("Could not start: " + event.message);
+worker.onerror = (event) => setStatus("시작할 수 없습니다: " + event.message);
 
 $("speak").onclick = () => {
   busy = true; update(); phonemes = [];
   request += 1;
-  setStatus("Speaking…", 0);
+  setStatus("합성 중…", 0);
   worker.postMessage({ type: "speak", id: request, text: $("text").value,
-                       voice: Number(document.querySelector("input[name=voice]:checked").value), speed: Number($("speed").value) });
+                       speed: Number($("speed").value), pitchShift: Number($("pitch").value), pitchRange: 1 });
 };
 $("text").addEventListener("keydown", (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && !$("speak").disabled) $("speak").click();
 });
 
-setStatus("Loading the model and the phonemizer…");
+setStatus("모델과 발음 사전을 불러오는 중…");
 worker.postMessage({ type: "load" });
 </script>
 </body>

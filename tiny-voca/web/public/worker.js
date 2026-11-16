@@ -1,10 +1,19 @@
-// Runs the phonemizer (dizione, through Pyodide) and the model (ONNX Runtime Web)
-// off the main thread. Messages in: {type: "load"} and {type: "speak", id, text,
-// voice, speed}. Messages out: status, ready, sentence, done, error.
+// Korean front end + ONNX model, off the main thread.
+//
+// Messages in: {type: "load"} and {type: "speak", id, text, speed, pitchShift, pitchRange}.
+// Messages out: status, ready, sentence, done, error.
+//
+// The phonemizer is the same Python the model was trained on: kofront (the
+// tiny-voca Korean front end) drives g2pK for Korean spans and dizione for
+// English spans, so a code-mixed sentence is tokenised exactly as in training.
+// g2pK needs a morphological analyser; python-mecab-ko has no WASM build, so
+// mecab.py (a pure-Python stand-in plus a dictionary of the corpus analyses)
+// stands in for it. The model is the exported free-running graph: tokens and
+// stress in, waveform out, durations predicted.
 
 const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/";
 const ORT = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
-const DATA = ["lexicon.tsv", "align.json", "g2p.json", "g2p.npz", "homographs.json"];
+const DIZIONE_DATA = ["lexicon.tsv", "align.json", "g2p.json", "g2p.npz", "homographs.json"];
 
 importScripts(PYODIDE + "pyodide.js", ORT + "ort.wasm.min.js");
 
@@ -20,7 +29,7 @@ async function download(url, label) {
   const key = `${url}?v=${VERSION}`;
   let store = null;
   try {
-    store = await caches.open("tiny-voca-" + VERSION);
+    store = await caches.open("tiny-voca-ko-" + VERSION);
     const hit = await store.match(key);
     if (hit) return new Uint8Array(await hit.arrayBuffer());
   } catch (error) { store = null; }
@@ -51,59 +60,71 @@ async function fetchBytes(url, label) {
 }
 
 async function loadPhonemizer() {
-  status("Loading the phonemizer");
+  status("음성 분석 준비");
   pyodide = await loadPyodide({ indexURL: PYODIDE });
-  await pyodide.loadPackage("numpy");
-  const [source, ...files] = await Promise.all([
-    download("assets/dizione.zip", "Loading the phonemizer"),
-    ...DATA.map((name) => download("assets/phonemizer/" + name, "Loading the dictionary")),
+  await pyodide.loadPackage(["numpy", "nltk"]);
+  const [front, dizione, dictionary, cmudict, ...data] = await Promise.all([
+    download("assets/pyfront.zip", "음성 분석 준비"),
+    download("assets/dizione.zip", "영어 사전 준비"),
+    download("assets/mecab-dict.json", "형태 분석 사전 준비"),
+    download("assets/phonemizer/cmudict.zip", "영어 사전 준비"),
+    ...DIZIONE_DATA.map((name) => download("assets/phonemizer/" + name, "발음 사전 준비")),
   ]);
-  status("Starting the phonemizer");
+  status("음성 분석 실행");
   pyodide.FS.mkdirTree("/dizione-data");
-  DATA.forEach((name, index) => pyodide.FS.writeFile("/dizione-data/" + name, files[index]));
-  pyodide.unpackArchive(source.buffer, "zip", { extractDir: "/dizione-src" });
+  DIZIONE_DATA.forEach((name, index) => pyodide.FS.writeFile("/dizione-data/" + name, data[index]));
+  pyodide.FS.mkdirTree("/nltk_data/corpora");
+  pyodide.FS.writeFile("/nltk_data/corpora/cmudict.zip", cmudict);
+  pyodide.unpackArchive(front.buffer, "zip", { extractDir: "/pyfront" });
+  pyodide.unpackArchive(dizione.buffer, "zip", { extractDir: "/pyfront" });
+  pyodide.FS.writeFile("/pyfront/mecab-dict.json", dictionary);
   pyodide.runPython(`
 import json, os, sys
 os.environ["DIZIONE_DATA"] = "/dizione-data"
-sys.path.insert(0, "/dizione-src")
-import dizione
+os.environ["MECAB_DICT"] = "/pyfront/mecab-dict.json"
+sys.path.insert(0, "/pyfront")
+import nltk
+nltk.data.path.insert(0, "/nltk_data")
+from kofront.korean import phonemize_mixed
 
 def phonemize_json(text):
-    result = dizione.phonemize(text)
-    return json.dumps({"ids": list(result.ids), "stress": list(result.stress), "text": str(result)})
+    result = phonemize_mixed(text)
+    return json.dumps({"ids": list(result.ids), "stress": list(result.stress),
+                       "symbols": list(result.symbols), "unknown": list(result.unknown)})
 
-phonemize_json("Warm up.")
+phonemize_json("테스트 문장입니다.")
 `);
   phonemize = pyodide.globals.get("phonemize_json");
 }
 
 async function loadModel() {
   config = await (await fetch("assets/config.json")).json();
-  const bytes = await download("assets/model.onnx", "Loading the model");
-  status("Starting the model");
+  const bytes = await download("assets/model.onnx", "모델 다운로드");
+  status("모델 실행");
   ort.env.wasm.wasmPaths = ORT;
   ort.env.wasm.numThreads = 1;
   session = await ort.InferenceSession.create(bytes, { executionProviders: ["wasm"] });
 }
 
-const ABBREVIATIONS = /(?:\b(?:mr|mrs|ms|dr|prof|sr|jr|st|vs|etc|no|inc|ltd|co|e\.g|i\.e|a\.m|p\.m)|\b[A-Z])\.$/i;
-
-// Sentences, without breaking after titles, initials or inside numbers.
+// Sentences: Korean ends a sentence at . ! ? … (and the vertical bar the corpus
+// uses), so split on those, keeping the mark with the sentence it closes.
 function sentences(text) {
   const parts = [];
   let current = "";
-  for (const piece of text.replace(/\s+/g, " ").trim().split(/(?<=[.!?…]["')\]]?)\s+(?=["'(\[]?[A-Z0-9])/)) {
+  for (const piece of text.replace(/\s+/g, " ").trim().split(/(?<=[.!?…])\s+/)) {
+    if (!piece) continue;
     current = current ? current + " " + piece : piece;
-    if (!ABBREVIATIONS.test(current)) { parts.push(current); current = ""; }
+    if (/[.!?…]$/.test(current) || current.length > 60) { parts.push(current); current = ""; }
   }
   if (current) parts.push(current);
   return parts.filter((part) => /[\p{L}\p{N}]/u.test(part));
 }
 
-// One utterance holds at most max_tokens phonemes; longer sentences are cut at commas, then by words.
+// One utterance holds at most max_tokens tokens; longer sentences are cut at
+// commas, then in half.
 function fit(sentence) {
   const result = JSON.parse(phonemize(sentence));
-  if (result.ids.length <= config.model.max_tokens - 12) return [result];
+  if (result.ids.length <= config.max_tokens - 12) return [result];
   const pieces = sentence.split(/(?<=[,;:—])\s+/);
   if (pieces.length > 1) return pieces.flatMap(fit);
   const words = sentence.split(" ");
@@ -112,19 +133,19 @@ function fit(sentence) {
   return [...fit(words.slice(0, half).join(" ")), ...fit(words.slice(half).join(" "))];
 }
 
-async function synthesize(phones, voice, speed) {
+async function synthesize(phones, speed, pitchShift, pitchRange) {
   const count = phones.ids.length;
   const integers = (values) => new ort.Tensor("int64", BigInt64Array.from(values.map(BigInt)), [1, count]);
   const scalar = (value) => new ort.Tensor("float32", Float32Array.from([value]), [1]);
   const output = await session.run({
     tokens: integers(phones.ids), stress: integers(phones.stress),
-    voice: new ort.Tensor("int64", BigInt64Array.from([BigInt(voice)]), [1]),
-    speed: scalar(speed), pitch_shift: scalar(0), pitch_range: scalar(1),
+    voice: new ort.Tensor("int64", BigInt64Array.from([0n]), [1]),
+    speed: scalar(speed), pitch_shift: scalar(pitchShift), pitch_range: scalar(pitchRange),
   });
-  return output.audio.data;
+  return { audio: output.audio.data, durations: output.durations.data };
 }
 
-async function speak({ id, text, voice, speed }) {
+async function speak({ id, text, speed, pitchShift, pitchRange }) {
   const started = performance.now();
   const list = sentences(text);
   const chunks = [];
@@ -136,10 +157,11 @@ async function speak({ id, text, voice, speed }) {
     phonemeTime += performance.now() - mark;
     for (const phones of utterances) {
       mark = performance.now();
-      const audio = await synthesize(phones, voice, speed);
+      const audio = (await synthesize(phones, speed, pitchShift, pitchRange)).audio;
       modelTime += performance.now() - mark;
       chunks.push(audio);
-      postMessage({ type: "sentence", id, index, total: list.length, phonemes: phones.text });
+      postMessage({ type: "sentence", id, index, total: list.length,
+                    phonemes: phones.symbols.filter((s) => !s.startsWith("<")).join("") });
     }
   }
   const length = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
@@ -154,7 +176,7 @@ onmessage = async ({ data }) => {
   try {
     if (data.type === "load") {
       await Promise.all([loadPhonemizer(), loadModel()]);
-      postMessage({ type: "ready", voices: config.voices });
+      postMessage({ type: "ready", voices: config.voices, step: config.step });
     } else if (data.type === "speak") {
       await speak(data);
     }

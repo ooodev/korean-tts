@@ -7,10 +7,12 @@ data/
 runs/
 *.pt
 *.onnx
+!web/public/assets/model.onnx
 *.wav
 *.flac
 .env
 ops/
-web/public/assets/
+# The Korean demo serves these from the repository, so GitHub Pages can publish
+# them without a build step (scripts/build_web_assets.py regenerates them).
 web/.wrangler/
 node_modules/
