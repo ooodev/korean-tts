@@ -41,7 +41,7 @@ import unicodedata
 FRONTEND_VERSION = 3
 ESPEAK_VOICE = "en-us"
 SEPARATOR = "_"
-FRONTENDS = ("espeak", "own", "ko")
+FRONTENDS = ("espeak", "own", "ko", "ko-loan")
 FRONTEND_VARIABLE = "TINY_VOCA_FRONTEND"
 _frontend = os.environ.get(FRONTEND_VARIABLE, "espeak")
 if _frontend not in FRONTENDS:
@@ -140,6 +140,16 @@ def frontend_identity():
     if _frontend == "own":
         phonemizer = _dizione()
         return {"frontend_version": phonemizer.VERSION, "phonemizer": "dizione", "symbols": list(SYMBOLS)}
+    if _frontend == "ko-loan":
+        from .korean import g2p
+        g2p()                                                       # import g2pk so its version is known
+        from . import loanwords
+        phonemizer = _dizione()
+        return {"frontend_version": 2, "phonemizer": "dizione+g2pk+loanwords", "language": "ko-loan",
+                "g2pk_version": _g2pk_version(),
+                "phonemizer_build": phonemizer.identity()["fingerprint"],
+                "loanword_dictionary": loanwords.dictionary_fingerprint(),
+                "symbols": list(SYMBOLS)}
     if _frontend == "ko":
         from .korean import g2p
         g2p()                                                       # import g2pk so its version is known
@@ -156,6 +166,10 @@ def frontend_runtime():
     tokens: the eSpeak version, or the fingerprint of the phonemizer build."""
     if _frontend == "own":
         return {"phonemizer": _dizione().identity()["fingerprint"]}
+    if _frontend == "ko-loan":
+        from .korean import g2p
+        g2p()                                                       # import g2pk so its version is known
+        return {"phonemizer": _dizione().identity()["fingerprint"], "g2pk": _g2pk_version()}
     if _frontend == "ko":
         from .korean import g2p
         g2p()                                                       # import g2pk so its version is known
@@ -293,9 +307,9 @@ def tokenize(pieces):
 def phonemize(text):
     if not isinstance(text, str) or not text.strip():
         raise ValueError("text must not be empty")
-    if _frontend == "ko":
+    if _frontend in ("ko", "ko-loan"):
         from .korean import phonemize_mixed
-        return phonemize_mixed(text)
+        return phonemize_mixed(text, _frontend)
     if _frontend == "own":
         return tokenize(_dizione().pieces(text))
     pieces = []

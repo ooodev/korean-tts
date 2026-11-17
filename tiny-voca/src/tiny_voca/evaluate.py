@@ -28,7 +28,7 @@ from .config import Config
 from .data import AnnotatedDataset
 from .infer import load_model, speak
 from .losses import SpectralLoss
-from .text import frontend, phonemize
+from .text import frontend, frontend_fingerprint, phonemize, set_frontend
 
 NOVEL_SENTENCES = (
     "The quick brown fox jumps over the lazy dog near the quiet river.",
@@ -41,6 +41,15 @@ NOVEL_SENTENCES = (
     "She sells seashells by the seashore, and the shells she sells are surely seashells.",
 )
 SEMITONES = 12 / np.log(2)
+
+
+def asr_defaults(frontend_name):
+    """Whisper model/language defaults per serving front end. The Korean front
+    ends (``ko``, ``ko-loan``) are measured with the Korean model; the English
+    front ends (``own``, ``espeak``) with small.en — the English gate of a
+    bilingual checkpoint serves under ``own`` and must land on small.en."""
+    korean = frontend_name in ("ko", "ko-loan")
+    return ("small" if korean else "small.en"), ("ko" if korean else "en")
 
 
 def normalizer(language="en"):
@@ -97,6 +106,12 @@ def main():
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--asr-model", default=None, help="faster-whisper model (default: small for the Korean front end, small.en otherwise)")
     parser.add_argument("--asr-language", default=None, help="Whisper language (default: ko for the Korean front end, en otherwise)")
+    parser.add_argument("--serve-frontend", default=None, choices=("own", "ko-loan"),
+                        help="Phonemize with this front end instead of the process front end. "
+                             "Bilingual checkpoints store one front end (ko-loan) but must be served "
+                             "with the other (own) for the English gate: load under the training "
+                             "front end, switch before synthesis. The manifest must then be a merged "
+                             "one (declared front-end sets), not a single-run manifest.")
     parser.add_argument("--no-asr", action="store_true")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--speed", type=float, default=1.0)
@@ -104,13 +119,22 @@ def main():
     args = parser.parse_args()
     import soundfile as sf
     from .train import balanced_indices
-    model = load_model(args.checkpoint, args.device)
+    # A bilingual checkpoint stores one front end (ko-loan); the English gate run
+    # serves with the other (own) on the same inventory, so the check is relaxed
+    # here exactly as infer.load_model documents for front-end mismatch runs.
+    model = load_model(args.checkpoint, args.device, check_frontend=False)
     c = model.config
     checkpoint_step = torch.load(args.checkpoint, map_location="cpu", weights_only=True)["step"]
     spectral = SpectralLoss(c.sample_rate)
     audio_dir = args.output / "audio"
     audio_dir.mkdir(parents=True, exist_ok=True)
     datasets = {split: AnnotatedDataset(args.annotations / (split + ".jsonl"), c, cache=False) for split in args.splits}
+    # After data loading, switch the serving front end if requested. The model
+    # and datasets were built under the process front end (the training one);
+    # synthesis now phonemises with the serving one. ``own``'s 76 tokens are the
+    # prefix of the unified 142 inventory, so its ids are valid in the model.
+    if args.serve_frontend:
+        set_frontend(args.serve_frontend)
     known_texts = set()
     for split in ("train", "validation", "test"):
         manifest = args.annotations / (split + ".jsonl")
@@ -172,9 +196,11 @@ def main():
         samples.append(record)
         print(json.dumps({"synthesised": record["id"], "seconds": record["generated_seconds"]}), flush=True)
 
-    korean = frontend() == "ko"
-    asr_model = args.asr_model or ("small" if korean else "small.en")
-    asr_language = args.asr_language or ("ko" if korean else "en")
+    # ko-loan is the v2 Korean serving mode (Korean pathway + Korean numerals);
+    # it needs the same Korean ASR as the pure ko front end.
+    model_default, language_default = asr_defaults(frontend())
+    asr_model = args.asr_model or model_default
+    asr_language = args.asr_language or language_default
     if not args.no_asr:
         import jiwer
         from faster_whisper import WhisperModel

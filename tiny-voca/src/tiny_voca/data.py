@@ -62,13 +62,25 @@ class AnnotatedDataset:
         self.config = config
         if not self.rows:
             raise ValueError("empty dataset")
+        # A merged manifest declares the front ends and annotation runs it was
+        # assembled from (metadata keys ``frontends``/``annotations``); a row then
+        # needs only to belong to one of them. Single-run manifests keep the strict
+        # single-value checks against the active front end.
+        declared_frontends = metadata.get("frontends")
+        declared_annotations = metadata.get("annotations")
         frontend = frontend_fingerprint()
         for row in self.rows:
-            if "durations" not in row or row.get("frontend") != frontend:
+            if declared_frontends is not None:
+                if "durations" not in row or row.get("frontend") not in declared_frontends:
+                    raise ValueError("tokens were produced by an undeclared front end; re-run annotation")
+            elif "durations" not in row or row.get("frontend") != frontend:
                 raise ValueError("tokens were produced by a different front end; re-run annotation")
             if row.get("acoustic") != config.acoustic_fingerprint:
                 raise ValueError("acoustic feature settings differ from this configuration")
-            if row.get("annotation") != self.annotation:
+            if declared_annotations is not None:
+                if row.get("annotation") not in declared_annotations:
+                    raise ValueError("manifest rows come from a different annotation run")
+            elif row.get("annotation") != self.annotation:
                 raise ValueError("manifest rows come from a different annotation run")
             if len(row["tokens"]) != len(row["durations"]) or len(row["tokens"]) != len(row["stress"]):
                 raise ValueError(f"token/duration length mismatch: {row['id']}")
@@ -101,9 +113,13 @@ class AnnotatedDataset:
         if self._cache is not None and index in self._cache:
             return self._cache[index]
         row, c = self.rows[index], self.config
-        path = (self.root / row["path"]).resolve()
-        if not path.is_relative_to(self.root.resolve()):
+        relative = Path(row["path"])
+        # Lexical containment: resolving would follow the directory junctions under
+        # a merged acoustic root (features_mixed/ko -> features2, ...) and fail the
+        # is_relative_to test for files that are safely inside the root.
+        if relative.is_absolute() or ".." in relative.parts:
             raise ValueError("feature file escapes the acoustic root")
+        path = self.root / relative
         stored = torch.load(path, map_location="cpu", weights_only=True)
         t = row["frames"]
         if stored["mel"].shape != (t, c.n_mels) or stored["prosody"].shape != (t, 3) or stored["wave"].shape != (t * c.hop,):

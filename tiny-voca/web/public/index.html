@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>tiny-voca 한국어</title>
-<meta name="description" content="4.5M 파라미터 한국어 TTS 모델. 이 페이지는 브라우저에서 바로 합성합니다.">
+<title>tiny-voca 한국어 · English</title>
+<meta name="description" content="450만 파라미터 이중 언어 TTS 모델. 한국어(KSS)와 영어(F2·M2)를 브라우저에서 합성합니다.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23171512'/%3E%3Cpath d='M8 13v6M12 9v14M16 12v8M20 7v18M24 13v6' stroke='%23f4efe6' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
   :root {
@@ -32,8 +32,9 @@
                      border-radius: 999px; padding: 5px 11px; cursor: pointer; }
   .examples button:hover { color: var(--ink); border-color: var(--muted); }
   .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; border-top: 1px solid var(--line); margin-top: 14px; padding-top: 14px; }
-  .voice { font-size: 14px; color: var(--muted); border: 1px solid var(--line); border-radius: 9px; padding: 6px 12px; }
-  .voice b { color: var(--ink); }
+  .voice { font-size: 14px; color: var(--muted); display: inline-flex; align-items: center; gap: 8px; }
+  .voice select { font: 14px var(--ui); color: var(--ink); background: transparent;
+                  border: 1px solid var(--line); border-radius: 9px; padding: 6px 12px; }
   .speed { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
   .speed input { width: 110px; accent-color: var(--accent); }
   .speed output { font: 13px var(--mono); color: var(--ink); min-width: 4ch; }
@@ -71,17 +72,18 @@
 <body>
 <main>
   <header>
-    <h1>tiny-voca <span>한국어</span></h1>
-    <p><strong>450만 파라미터</strong> 한국어 TTS 모델입니다. 영문이 섞인 문장은 영어 그대로,
-       한국어는 g2pk 음운 규칙으로 읽습니다. 이 페이지는 모델을 브라우저에서 직접 돌리므로
-       입력한 텍스트가 기기 밖으로 나가지 않습니다.</p>
+    <h1>tiny-voca <span>한국어 · English</span></h1>
+    <p><strong>450만 파라미터</strong> 이중 언어 TTS 모델입니다. 한국어(KSS)는 g2pk 음운 규칙과
+       한국식 수어로, 영어(F2·M2)는 dizione IPA로 읽습니다. 한국어 속에 섞인 영어 단어와 숫자는
+       한국식 발음으로 이어집니다. 이 페이지는 모델을 브라우저에서 직접 돌리므로 입력한 텍스트가
+       기기 밖으로 나가지 않습니다.</p>
   </header>
 
   <section class="panel">
     <textarea id="text" spellcheck="false" aria-label="합성할 문장">안녕하세요. 오늘 날씨가 정말 맑고 좋네요.</textarea>
     <div class="examples" id="examples"></div>
     <div class="controls">
-      <span class="voice">음성 <b>KSS</b></span>
+      <span class="voice">음성 <select id="voice" aria-label="음성 선택"></select></span>
       <label class="speed">빠르기 <input id="speed" type="range" min="0.7" max="1.4" step="0.05" value="1"><output id="speed-value">1.00</output></label>
       <label class="speed">음높이 <input id="pitch" type="range" min="-0.12" max="0.12" step="0.01" value="0"><output id="pitch-value">0.00</output></label>
       <button id="speak" disabled>합성</button>
@@ -102,13 +104,14 @@
     <details><summary>음소 (자모)</summary><pre id="phonemes"></pre></details>
   </section>
 
+  <!-- PUBLISH: fill the ONNX size, elapsed training time, and final gate numbers at publish -->
   <section class="facts">
-    <div><b>4,549,579</b><span>파라미터, 파형 생성기 포함</span></div>
-    <div><b>21.4 MB</b><span>모델 파일 (ONNX, float32)</span></div>
+    <div><b>4,550,347</b><span>파라미터, 파형 생성기 포함</span></div>
     <div><b>24 kHz</b><span>모노 출력</span></div>
-    <div><b>8.45 시간</b><span>정렬된 한국어 발화 (KSS)</span></div>
-    <div><b>130,000</b><span>학습 스텝, RTX 4090 11시간 35분</span></div>
-    <div><b>CER 11.8 %</b><span>보유 검증 세트 (원음 2.6 %)</span></div>
+    <div><b>3 음성</b><span>KSS 한국어 · F2·M2 영어</span></div>
+    <div><b>142</b><span>통합 어휘 토큰 (영어 76 + 한국어 66)</span></div>
+    <div><b>160,000</b><span>학습 스텝, RTX 4090 <!-- PUBLISH: elapsed --></span></div>
+    <div><b>…</b><span><!-- PUBLISH: final KO CER / EN WER --></span></div>
   </section>
 
   <footer>
@@ -116,31 +119,35 @@
     <a href="https://github.com/n4ze3m/tiny-voca">tiny-voca</a>
     <a href="https://github.com/n4ze3m/dizione">dizione</a>
     <a href="https://huggingface.co/datasets/Bingsu/KSS_Dataset">KSS</a>
-    <a href="en.html">English demo</a>
-    <p>첫 방문 시 약 40 MB를 받습니다: 모델, 발음 사전, Python 런타임(Pyodide). 한국어와 영어
-       혼용 문장을 읽지만, KSS에 영어 발화가 없어 영어 음성은 학습되지 않았습니다. 형태 분석은
-       코퍼스에서 뽑은 사전으로 MeCab를 대체하므로, 사전에 없는 단어에서 음운 규칙 하나가
-       달라질 수 있습니다(문장당 토큰 99.8 % 일치). KSS는 CC BY-NC-SA 4.0입니다.</p>
+    <a href="https://huggingface.co/datasets/n4ze3m/tiny-voca">영어 코퍼스</a>
+    <a href="en.html">English demo (v1)</a>
+    <p>첫 방문 시 약 40 MB를 받습니다: 모델, 발음 사전, Python 런타임(Pyodide). 하나의 모델이
+       두 언어를 읽습니다: 한국어 문장은 g2pk 음운 규칙과 한국식 수어를, 영어 문장은 dizione IPA를
+       씁니다. 형태 분석은 코퍼스에서 뽑은 사전으로 MeCab를 대체하므로, 사전에 없는 단어에서
+       음운 규칙 하나가 달라질 수 있습니다(문장당 토큰 99.8 % 일치). 한국어 코퍼스(KSS)는
+       CC BY-NC-SA 4.0이므로, 이 모델과 이 페이지는 비상업적 이용입니다.</p>
   </footer>
 </main>
 
 <script>
 const EXAMPLES = [
-  ["인사", "안녕하세요. 오늘 날씨가 정말 맑고 좋네요."],
-  ["질문", "지금 몇 시인지 혹시 알려주실 수 있나요?"],
-  ["숫자", "이천이십육 년 십일 월 십오 일 오후 세 시 삼십 분입니다."],
-  ["음운 규칙", "국물 맛이 끝내주고 신라의 역사도 흥미롭습니다."],
-  ["감탄", "와, 정말 대단하네요! 드디어 한국어 합성에 성공했습니다!"],
-  ["한영 혼용", "오늘 Python으로 테스트를 진행했습니다."],
+  ["인사 (KSS)", "안녕하세요. 오늘 날씨가 정말 맑고 좋네요.", "KSS"],
+  ["질문 (KSS)", "지금 몇 시인지 혹시 알려주실 수 있나요?", "KSS"],
+  ["숫자 (KSS)", "이천이십육 년 십일 월 십오 일 오후 세 시 삼십 분입니다.", "KSS"],
+  ["음운 규칙 (KSS)", "국물 맛이 끝내주고 신라의 역사도 흥미롭습니다.", "KSS"],
+  ["감탄 (KSS)", "와, 정말 대단하네요! 드디어 한국어 합성에 성공했습니다!", "KSS"],
+  ["한영 혼용 (KSS)", "오늘 Python으로 테스트를 진행했습니다.", "KSS"],
+  ["영어 (F2)", "It was a bright cold day in April, and the clocks were striking thirteen.", "F2"],
+  ["영어 (M2)", "Nothing is impossible to the person who tries, so we begin tomorrow.", "M2"],
 ];
 const $ = (id) => document.getElementById(id);
 const worker = new Worker("worker.js");
 let ready = false, busy = false, request = 0, url = null;
 
-for (const [label, text] of EXAMPLES) {
+for (const [label, text, voice] of EXAMPLES) {
   const button = document.createElement("button");
   button.textContent = label;
-  button.onclick = () => { $("text").value = text; $("text").focus(); };
+  button.onclick = () => { $("text").value = text; $("voice").value = voice; $("text").focus(); };
   $("examples").append(button);
 }
 $("speed").oninput = () => { $("speed-value").textContent = Number($("speed").value).toFixed(2); };
@@ -169,7 +176,16 @@ function wav(samples, rate) {
 let phonemes = [];
 worker.onmessage = ({ data }) => {
   if (data.type === "status") setStatus(data.text, data.progress);
-  else if (data.type === "ready") { ready = true; setStatus(`준비 완료 — 스텝 ${data.step}.`); update(); }
+  else if (data.type === "ready") {
+    ready = true;
+    for (const name of data.voices) {
+      const option = document.createElement("option");
+      option.value = name; option.textContent = name;
+      $("voice").append(option);
+    }
+    setStatus(`준비 완료 — 스텝 ${data.step}, 음성 ${data.voices.join(" · ")}.`);
+    update();
+  }
   else if (data.type === "sentence" && data.id === request) {
     phonemes.push(data.phonemes);
     setStatus(`${data.total}문장 중 ${data.index + 1}번 합성`, (data.index + 1) / data.total);
@@ -198,7 +214,7 @@ $("speak").onclick = () => {
   busy = true; update(); phonemes = [];
   request += 1;
   setStatus("합성 중…", 0);
-  worker.postMessage({ type: "speak", id: request, text: $("text").value,
+  worker.postMessage({ type: "speak", id: request, text: $("text").value, voice: $("voice").value,
                        speed: Number($("speed").value), pitchShift: Number($("pitch").value), pitchRange: 1 });
 };
 $("text").addEventListener("keydown", (event) => {

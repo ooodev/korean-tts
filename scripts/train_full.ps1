@@ -16,7 +16,8 @@ param(
     [string]$Annotations = "annotations_full",
     [string]$Config = "config-ko.json",
     [string]$Log = "logs_train_full.txt",
-    [int]$MaxAttempts = 40
+    [int]$MaxAttempts = 40,
+    [string]$Frontend = "ko"   # v2.0 trains with ko-loan
 )
 
 $ErrorActionPreference = "Continue"
@@ -25,7 +26,7 @@ $env:PYTHONUTF8 = "1"
 $env:PYTHONWARNINGS = "ignore"
 $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
 $env:DIZIONE_DATA = "C:\ai-workspace\korean-tts\weights\phonemizer"
-$env:TINY_VOCA_FRONTEND = "ko"
+$env:TINY_VOCA_FRONTEND = $Frontend
 $env:PYTORCH_CUDA_ALLOC_CONF = "expandable_segments:True"
 
 $python = ".venv\Scripts\python.exe"

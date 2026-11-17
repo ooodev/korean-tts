@@ -1,0 +1,171 @@
+# Bilingual TTS on `tiny-voca` + `dizione` — final report v2.0
+
+One 4.5M-parameter model that speaks **Korean natively** (voice KSS, Mode A
+`ko-loan`) and **English natively** (voices F2/M2, Mode B `own`), with Arabic
+numerals pronounced the Korean way and English spans inside Korean sentences
+read as Korean loanwords. Hardware: RTX 4090 24 GB, Ryzen 9 5900X (24 threads),
+39.9 GiB RAM, Windows 11, Python 3.11.16, CUDA 12.6.
+
+Licences: KSS **CC BY-NC-SA 4.0** — the Korean voice and the model weights
+inherit the non-commercial clause. The English voice is trained on the
+upstream `n4ze3m/tiny-voca` dataset (F2/M2).
+
+## Summary
+
+| | |
+| --- | --- |
+| Serving | one checkpoint, two front ends — voice selects the mode: KSS → Mode A (`ko-loan`), F2/M2 → Mode B (`own`) |
+| Front end | 142-token unified vocabulary (unchanged from v1); Mode A adds Korean TN + loanword G2P→Jamo before segmentation |
+| Corpus | KSS 12 210/322/322 clips (8.45 h) + n4ze3m EN 7 976/702/576 clips; merged manifest **16 451 / 933 / 802** |
+| Aligners | `wav2vec2-large-xlsr-korean` CTC (KSS, reusing v1's `annotations_full`) + `wav2vec2-lv-60-espeak-cv-ft` CTC (F2/M2, `own` front end) |
+| Model | **4 550 347** parameters, 3 speakers (`KSS`, `F2`, `M2`), **160 000 steps** from scratch (GAN from 8 000) on an RTX 4090 <!-- PUBLISH: elapsed time --> |
+| Gates | KO CER ≤ 12.5 % (v1: 11.8 %) at the KSS rows, EN WER ≤ 1.5 % with `small.en` at the F2/M2 rows; decision gates at 80k/120k <!-- PUBLISH: final gate numbers --> |
+| Batteries | 20-case number battery + 20-word loanword battery (P1 golden tables) + 16-case Mode A+B listening set <!-- PUBLISH: results --> |
+| Browser demo | voice `<select>` (3 voices), voice=mode routing, 8 example chips; ONNX + Pyodide in the page <!-- PUBLISH: published-site measurement --> |
+
+## 1. Serving modes (one checkpoint, two front ends)
+
+| Mode | Front end | English spans | Numbers | Voice |
+| --- | --- | --- | --- | --- |
+| **A — "Korean speaker"** (default) | `ko-loan` | loanword G2P → Jamo | Korean TN | KSS |
+| **B — "native English"** | `own` | dizione IPA (stress 0/1/2) | English | F2 / M2 |
+| C — (reserved, v2.1) | `ko` | dizione IPA under KSS voice | — | KSS |
+
+The two modes are one faithful dispatch (`text.phonemize` under the serving
+front end), not two code paths: `ko`/`ko-loan` → `phonemize_mixed`, `own` → the
+dizione path. The browser worker, the EN gate, and the annotations all call the
+same dispatch — which is what keeps
+`frontend_token_mismatches: 0` at every layer.
+
+## 2. Front end (Phase 1)
+
+New mode `ko-loan` and the Korean TN/loanword engine, implemented per
+`V2_SPEC.md` §2:
+
+- **Korean TN before segmentation** (`expand_numbers` rework): counters,
+  Sino units, clock times, dates, phone numbers, currency, percents, ranges,
+  units — the full spec §2.2 table; `0 → 공` in digit-by-digit runs.
+- **Loanword G2P** (`loanwords.py`): curated dictionary → acronym letter
+  names → OOV fallback (dizione IPA → IPA→Jamo state machine per the
+  외래어 표기법 rules) → syllabification → NFD Jamo, stress 0, syllable `units`
+  (kalign-compatible). IPA fallback kept < 2 % of prompt tokens.
+- `own` and `ko` are byte-unchanged; their tests stayed green throughout.
+
+Verification gate (spec §2.4): **185 golden cases, 100 % pass**
+(`tests/test_frontend_gate.py`: 20 sandhi / 75 TN / 52 loanword / 20 Mode A
+segmentation / 10+ Mode B regression); suite **257 OK, 2 skipped** (67 in v1,
+including 5 new `--serve-frontend` regression tests).
+
+## 3. Data (Phase 2)
+
+| Corpus | Train / Val / Test | Notes |
+| --- | --- | --- |
+| KSS (KSS voice) | 12 210 / 322 / 322 | reused from v1: sentence-wise split, 24 kHz mono, 0 `<unk>` |
+| n4ze3m/tiny-voca (F2/M2) | 7 976 / 702 / 576 | screened per spec §3: Whisper WER ≤ 0.10, 0.5–15 s, < 512 tokens, zero `<unk>` under `own`; 0 rejected at preparation |
+
+Merged manifest (`annotations_mixed`, fingerprint `3b930c46d7498d22`):
+**train 16 451 / validation 933 / test 802**. `features_mixed/{ko,en}` are
+junctions to `features2` / `features_en`.
+
+## 4. Alignment
+
+- **KSS**: `kalign` (Korean CTC Viterbi at syllable level, energy/voicing
+  sub-allocation to Jamo) — v1's `annotations_full` reused verbatim; the
+  `units` spans carry the loanword syllables, so Mode A text aligns directly.
+- **F2/M2**: `wav2vec2-lv-60-espeak-cv-ft` CTC under the `own` front end —
+  the upstream v4 alignment path. Full run 3.3 min: train 7 947/7 976
+  (29 rejected), val 699/702, test 574/576, `complete: true`.
+
+## 5. Training (Phase 3)
+
+- `config-v2.json`: KSS/F2/M2, `vocab_size 142`, acoustics identical to
+  `config-ko.json` (24 kHz, hop 256, n_fft 1024, 80 mels, F0 50–600).
+- **From scratch** (decision D1); the v1 checkpoint stays untouched as the
+  baseline. Warm-start fallback staged in advance: `eval/v2/warm-snapshot.pt`
+  (v1 weights under the v2 config, step 130 000, fresh critics) for the case
+  KO CER > 12.5 % at the 120k gate.
+- Recipe unchanged from v1: batch 12 000 frames/48 utterances, warmup 1 000,
+  half-life 100 000, GAN 8 000/3 000/0.7, teacher 3 000/7 000/0, 4-hour
+  resumable chunks.
+- Post-GAN throughput **≈ 3.7 steps/s** (v1: 3.2). <!-- PUBLISH: final elapsed time, step-verified -->
+
+## 6. Evaluation
+
+Decision gates at 80k/120k and the final gate on `runs/v2/inference.pt` run
+`scripts/run_v2_gates.ps1`:
+
+- **KO gate**: KSS rows of the merged test split
+  (`--per-voice 300 --novel 0`, 228 rows → all), metric
+  `summary.test.KSS.generated_cer`; pass ≤ 12.5 % (v1: 11.8 %).
+- **EN gate**: F2/M2 rows of the merged test slice
+  (`--per-voice 600`, 574 rows → all), served with
+  `TINY_VOCA_FRONTEND=ko-loan` + `evaluate --serve-frontend own` (the
+  checkpoint loads only under the training front end; the switch happens after
+  data loading, before synthesis), ASR **small.en** per spec §5, metric
+  `summary.test.all.generated_wer`; pass ≤ 1.5 %.
+
+<!-- PUBLISH: final gate table (KO CER, EN WER, duration ratio, pitch spread,
+mel DTW, per-voice entries, frontend_token_mismatches) + the 80k/120k decision
+history and the Q3 (160k vs 190k) outcome -->
+
+## 7. Samples & batteries
+
+- `scripts/battery_v2.py`: the spec §5 listening batteries — 20 number cases +
+  20 loanword cases imported from the P1 golden tables, text-level pre-check
+  against the locked contract, Mode A KSS synthesis, Whisper-ko CER proxy.
+- `scripts/listening_v2.py`: 16-case Mode A+B listening set on the final
+  checkpoint (greetings, numbers, code-mix, flow, questions, stress).
+
+<!-- PUBLISH: battery results + listening-set file list -->
+
+## 8. Browser demo (P5)
+
+- `worker.js`: speak messages carry `voice`/`mode`; voice → mode per §1
+  (explicit `mode` overrides). Phonemisation is the faithful dispatch
+  (`set_frontend` + `phonemize`) exactly as in the annotations —
+  `phonemize_mixed(text, "own")` was deliberately not used: it differs from
+  the standard path on quote+comma punctuation (4 of 10 EN corpus sentences).
+- `index.html`: voice `<select>` from `config.voices`, 8 example chips
+  (6 KSS Mode A + F2/M2 Mode B), bilingual copy, v2 facts.
+- Assets: `model.onnx` re-exported under `TINY_VOCA_FRONTEND=ko-loan` from
+  `runs/v2/inference.pt`, `VERSION` bumped for Cache Storage.
+
+<!-- PUBLISH: ONNX size, parity numbers (check_onnx.py), shim accuracy
+(check_shim.py), published-site measurement, live URL -->
+
+## 9. Reproducing
+
+```powershell
+# environment
+$env:PYTHONUTF8="1"; $env:TINY_VOCA_FRONTEND="ko-loan"
+$env:DIZIONE_DATA="C:\ai-workspace\korean-tts\weights\phonemizer"
+
+# 1. data: KSS (v1 shards, sentence-wise split) + screened n4ze3m EN corpus
+python scripts/prepare_kss.py            # v1 output reused
+python scripts/prepare_en.py             # EN screen -> data_en shards
+python -m tiny_voca.prepare ...          # acoustic features (ko + en, separate runs)
+
+# 2. alignment
+python -m tiny_voca.annotate ...         # ko (kalign)  -> annotations_full (reused)
+python -m tiny_voca.annotate ...         # own (espeak-CTC) -> annotations_en
+python scripts/merge_annotations.py      # annotations_mixed (16 451/933/802)
+
+# 3. train (chunked, auto-resume)
+powershell -File scripts/train_full.ps1 -Steps 160000 -Config config-v2.json ...
+
+# 4. gates at 80k/120k and final
+python scripts/gate_manifest.py ...      # KSS slice / F2+M2 slice
+powershell -File scripts/run_v2_gates.ps1 -Checkpoint runs/v2/inference.pt ...
+
+# 5. batteries + samples
+python scripts/battery_v2.py ...
+python scripts/listening_v2.py ...
+
+# 6. browser demo assets, then serve tiny-voca\web\public (or push: Pages publishes it)
+$env:TINY_VOCA_FRONTEND="ko-loan"
+python scripts/build_web_assets.py --checkpoint runs/v2/inference.pt --export
+python scripts/check_onnx.py; $env:MECAB_DICT="...mecab-dict.json"; python scripts/check_shim.py
+```
+
+Full flag sets: `DATASET.md`, `TRAIN.md`, `V2_SPEC.md`; the complete decision
+log: `WORKLOG.md`.

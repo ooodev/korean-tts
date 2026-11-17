@@ -41,18 +41,19 @@ KOREAN_VOWEL_IDS = frozenset(UNIFIED_TO_ID[j] for j in KOREAN_VOWELS)
 
 
 def inventory(frontend):
-    """The token list of one front end."""
-    return UNIFIED_VOCAB if frontend == "ko" else EN_SYMBOLS
+    """The token list of one front end. ``ko-loan`` (Mode A) shares the unified
+    inventory with ``ko``: every token, including loanword Jamo, is Korean."""
+    return UNIFIED_VOCAB if frontend in ("ko", "ko-loan") else EN_SYMBOLS
 
 
 def phones(frontend):
     """Tokens that must be realised as audio frames."""
-    return PHONES + (KOREAN_PHONES if frontend == "ko" else ())
+    return PHONES + (KOREAN_PHONES if frontend in ("ko", "ko-loan") else ())
 
 
 def vowels(frontend):
-    return VOWELS + (KOREAN_VOWELS if frontend == "ko" else ())
+    return VOWELS + (KOREAN_VOWELS if frontend in ("ko", "ko-loan") else ())
 
 
 def voiceless(frontend):
-    return EN_VOICELESS | (KOREAN_VOICELESS if frontend == "ko" else frozenset())
+    return EN_VOICELESS | (KOREAN_VOICELESS if frontend in ("ko", "ko-loan") else frozenset())

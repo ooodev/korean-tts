@@ -772,3 +772,574 @@ a bigger rule table (rules plateau at ~90 %, the dictionary is 0.95 MB and exact
 it applies); assets in git instead of a Pages build step (a build would need PyTorch on
 the runner for every docs-only commit).
 
+---
+
+## Phase 10 — Workspace cleanup (2026-11-17) ✅
+
+User request: remove everything from the workspace that is safe to delete. Basis:
+`.gitignore` + AGENTS.md both classify the intermediates as "not committed
+(regenerable)"; every deleted path is gitignored, so `git status` stayed clean
+throughout.
+
+**Second pass (same day)**: user confirmed the source will be modified and the model
+retrained from scratch, so *all* previously trained / completed model artifacts were
+removed as well. This deleted committed files, so `git status` now shows 68 ` D`
+entries (nothing else). Removed:
+
+| Path | Content |
+| --- | --- |
+| `runs/` (whole) | `inference.pt`, `model-noise.onnx`, config/recipe/metrics — the final model |
+| `annotations_full/` | trainer input manifests (re-run `tiny_voca.annotate`) |
+| `samples/` | deliverable wavs + ASR report (re-run `synthesize_samples.py` + `asr_check.py`) |
+| `eval/` | `eval/full` + `eval/precheck` reports & audio (re-run `tiny_voca.evaluate`) |
+| `logs_train_full.txt` | the committed 130 k-step training log |
+| `tiny-voca/web/public/assets/` | ONNX export of the old model for GitHub Pages (re-run `scripts/build_web_assets.py`) |
+
+Side effects to remember after the retrain: the live Pages demo at
+ooodev.github.io/korean-tts is served from deleted assets (restore with a new build +
+commit), and `scripts/check_onnx.py --strict` needs `runs/full/model-noise.onnx`
+re-exported. `weights/phonemizer/` was kept — it is the front-end dictionary, not a
+trained model.
+
+### Removed (24.45 GB; workspace went ~29.8 GB → 5.38 GB excl. `.git`)
+
+| Category | Paths | Size |
+| --- | --- | --- |
+| Parquet shards (stage 1/2, regenerable via `scripts/prepare_kss.py` + `resplit_kss.py`) | `data/`, `data_parts/`, `data_fast/`, `data_smoke/`, `data_smoke100/` | 3.85 GB |
+| Acoustic features (stage 3/4, regenerable via `tiny_voca.prepare` + `merge_features.py`) | `features/` (superseded 1st attempt), `features2/`, `features_w/`, `features_fast/`, `features_smoke/`, `features_smoke100/` | 17.86 GB |
+| Smoke/probe alignments (regenerable via `tiny_voca.annotate`) | `annotations/`, `annotations_fast/`, `annotations_fast2/`, `annotations_smoke/`, `annotations_smoke100/` | 0.01 GB |
+| Smoke/probe training runs | `runs/fast/`, `runs/fast2/`, `runs/full_probe/`, `runs/probe-smoke/`, `runs/probeA/`, `runs/probeB/`, `runs/probeC/`, `runs/smoke/` | 1.45 GB |
+| Resume checkpoints of the full run (regenerable by retraining; only `inference.pt` + config/recipe/metrics are committed) | `runs/full/last.pt`, `runs/full/step-{00008000…00130000}.pt` | 1.25 GB |
+| HF download cache (re-downloads on first use) | `weights/.cache/` | 0.00 GB |
+| Smoke/probe eval output (regenerable via `tiny_voca.evaluate`) | `eval/evaluate_probe/`, `eval/fast/`, `eval/fast2/`, `eval/smoke/`, `eval/precheck_asr.json` | 0.01 GB |
+| Per-stage logs (noise; decisions live in this file) | 18 × `logs_*.txt` except `logs_train_full.txt` | ~0.1 MB |
+| Bytecode caches | `__pycache__/` under `tiny-voca/`, `scripts/`, `.github/` | ~0.05 GB |
+
+### Kept (final state after the second pass)
+
+Source only: `tiny-voca/` + `dizione/` + `scripts/` + docs + `config-ko.json` +
+`.github/`. Plus `weights/phonemizer/` (front-end dictionary, not a trained model)
+and `.venv/` (5.25 GB — rebuilding it costs more than it saves). Nothing trained or
+exported remains; the workspace is a clean slate for the retrain.
+
+### Verification
+
+- `git status --short` → empty (no tracked file touched).
+- Re-measured workspace: 5.38 GB excl. `.git`; `.venv` is 84 % of the remainder.
+- Rebuilding the full pipeline from scratch costs stages 1–5 ≈ 45 min GPU/CPU
+  (20+12 s+22+1.5+8 min) if the intermediates are ever needed again.
+
+**Decision log**: deleted everything gitignored and documented as regenerable rather
+than keeping "just in case" copies — the pipeline's reproducibility is its committed
+artifacts + the scripts, and disk was the binding constraint from Phase 1. Kept
+`model-noise.onnx` (20 MB) because `check_onnx.py --strict` defaults to it and
+re-exporting via `scripts/build_web_assets.py --export` is a heavier gate than the
+space is worth.
+
+## 2026-11-17 — v2.0 bilingual spec locked (`V2_SPEC.md`)
+
+**Decision log**: user approved a unified KO+EN 4.5M model (v2.0) after review of the
+warm-start proposal. Locked decisions: D1 from-scratch training (v1.0
+`runs/full/inference.pt` stays the baseline; warm-start fallback at the 120k gate
+requires a snapshot-rebuild script since `last.pt` was deleted in the clean-slate pass);
+D2 keep the 142-token inventory (EN IPA rows 0-75 and KR Jamo rows 76-141 are already
+disjoint — zero phonetic collisions, 3-way stop contrast preserved; no redesign);
+D3 Korean-accented English = loanword G2P to Jamo, not IPA substitution (reuses the
+proven Korean acoustic pathway; IPA substitution produces a hybrid no model has heard);
+D4 dual aligners for v2.0 (kalign covers loanword output since it carries Hangul
+syllable units; unified CTC aligner deferred to v2.1 with a parity gate); D5 no language
+embedding (disjoint token sets already encode language; add only if prosody bleed shows);
+D6 corpus = KSS + n4ze3m/tiny-voca only (no synthetic code-switched data in v2.0).
+Phase order: P0 git restore + dataset download, P1 front end (TN rules incl. fixes for
+3개→삼개 and phone-number misreads, loanword G2P, ≥120-case gate), P2 EN alignment +
+manifest merge, P3 160k-step train (~14 h GPU), P4 evaluation gates.
+
+## 2026-11-18 — Phase 1 front end complete: TN engine, loanword wiring, 185-case gate green
+
+**P1 status: 100% verified.** The `ko-loan` front end (Mode A) is built and the
+golden-case gate passes. Order honored: P1 verified before any alignment/training.
+
+### What landed (this session)
+
+- `tiny-voca/src/tiny_voca/korean.py`
+  - `korean_normalize(text)`: full Mode A TN, pass order
+    etc → 3-part date → currency → % → time → phone → range → unit →
+    decimal → a/b → ordinal → month → hour → counter → `X\d+` codes →
+    ≥5-digit runs → bare digits (Sino) → symbol map. probe_tn 75/75.
+  - Counter sets: native = g2pK BOUND_NOUNS + 명 장 팩 잔 끼 칸; Sino = 층 년 월
+    일 분 초 원 회 등 점 호 기 차 페이지 코어 세 박 세기. Spacing: 세/박/살(>20)/
+    번째 get a space; `0시` → `영 시`.
+  - `loan_tokens()`: English span → `loanwords.loanword_span` (dict → acronym →
+    IPA fallback), each syllable → NFD Jamo (silent initial dropped), `stress=0`,
+    one labelled unit per syllable so kalign aligns loans like Korean words.
+    Returns `unknown=[]` (IPA-fallback syllables are valid Hangul, never UNK).
+  - `phonemize_mixed(text, frontend=None)`: `ko-loan` runs
+    `korean_normalize(normalize_ko(text))` before `segment()`; `ko` byte-unchanged.
+- `tiny-voca/src/tiny_voca/text.py`: `phonemize()` passes `frontend=_frontend`
+  through to `phonemize_mixed`.
+- `tiny-voca/src/tiny_voca/data/loanwords.tsv`: 447 entries; **line 11 fixed**
+  `clock 크록` → `clock 클록` (correct standard loanspelling).
+- `tiny-voca/tests/test_frontend_gate.py`: **185 golden cases** (≥ 120 required),
+  one test method per row: TNTests 75 (korean_normalize exact), LoanwordTests 55
+  (unit labels == dictionary loanspelling), SandhiTests 21 (== g2pK output),
+  ModeASegTests 22 (exact label tuple, no `<unk>`, no digits), ModeBTests 12
+  (`own` == dizione, save/restore).
+
+### Gates hit
+
+- `probe_tn.py` 75/75 (all V2_SPEC §2.2 rows).
+- `probe_seg.py` 22/22 Mode A unit-label tuples.
+- `test_frontend_gate.py` 185/185 (first run 184/185: one golden-case typo,
+  `국회의원` expectation written `구회 의원` from a stale note — g2pK actually
+  emits `구쾨의원`; fixed the case, not the engine, per the gate's own rule).
+- Full suite: `Ran 252 tests … OK (skipped=2)`, exit 0 (67 baseline + 185 gate).
+
+### Decisions
+
+- **Golden-case errors are fixed in the data, engine errors in the code.** The
+  gate docstring makes this explicit so a future "fix" that silently edits a
+  reading leaves a trail.
+- g2pK model quirks are pinned, not "corrected": 십이점→시비점, 삼점오→삼저모,
+  십구세기→십꾸세기 are the same model v1 annotations used, so the aligner and
+  the gate must agree with it.
+- `10km를` bug class: `\b` treats Hangul as word chars, so unit boundaries need an
+  ASCII-only lookahead `(?![A-Za-z0-9])`.
+
+### Next
+
+Phase 1 smoke stages (fresh prep + alignment smoke, fresh from-scratch training
+smoke, inference/export/web-demo smoke Mode A+B), then Phase 2 ~18 h full
+training on the joint corpus.
+
+## 2026-11-18 — Phase 1 smoke stage in progress: pipeline rebuilt, EN alignment verified
+
+### KSS data restored exactly (split-mismatch scare resolved)
+
+`prepare_kss.py` (committed, unmodified) shuffles to 12 211/321/322, but v1's final
+splits were 12 210/322/322 — because stage 2 `resplit_kss.py` re-groups the shuffled
+rows sentence-wise (no transcript in two splits). Re-ran `resplit_kss.py --seed 42`
+and verified the rebuilt `data/` shards against `annotations_full/` manifests:
+**12 210 / 322 / 322, every id and every transcript matches** (probe
+`probe_verify_shards.py`: PASS). KSS annotations reused as-is.
+
+### EN corpus screen (`scripts/prepare_en.py`, new)
+
+Reads the pinned snapshot from the HF cache (revision `63b6b896…`, refs/main), applies
+the V2 §3 screen: Whisper WER ≤ 0.10, 0.5–15 s, < 512 tokens, zero `<unk>` under the
+`own` front end. Writes KSS-compatible shards for `tiny_voca.prepare` (default Config:
+speakers F2/M2, 24 kHz). Bug caught & fixed on first run: the shared-text check dropped
+*within-split* duplicate takes (both voices read many sentences — valid rows; KSS has
+them too); only cross-split text is dropped, and the smoke run counted **zero** of
+those, so the upstream splits are sentence-unique. Smoke: 100 rows/split kept.
+
+### EN alignment smoke (espeak-CTC path validated)
+
+`tiny_voca.annotate --features features_en_smoke --output annotations_en_smoke
+--limit 100` with `TINY_VOCA_FRONTEND=own`: **300/300 accepted, 0 rejected**, F2/M2
+≈ 50/50 per split. Timing-probe stats match the shipped v4 annotations (vowel→voiceless
+flip_found 0.89/0.80, fricative→vowel 0.99/0.94). Identity: acoustic
+`a6ebc979…` (= KSS), frontend `c729f235…` (= v4 exactly), aligner
+`facebook/wav2vec2-lv-60-espeak-cv-ft` rev `ae45363b…` (= v4 exactly).
+
+### Merge/subset machinery (new)
+
+- `scripts/merge_annotations.py`: `features_mixed/{ko,en}` are `mklink /J` junctions;
+  rows get `ko/`/`en/` path prefixes; merged `annotations.json` declares
+  `frontends`/`annotations` fingerprint sets + embeds both identities. Junctions
+  repoint cleanly (smoke EN dir → full EN dir later).
+- `scripts/subset_manifest.py`: reproducible smoke subset, stratified by speaker,
+  verifies every selected `.pt` exists, carries the parent's declared sets + own
+  fingerprint.
+- `tiny_voca/data.py` patch (252 tests still OK):
+  1. declared-set checks — metadata `frontends`/`annotations` dicts accept a row when
+     its values are in the set; single-run manifests keep the strict checks.
+  2. junction-safe containment — `Path.resolve()` follows junctions and broke the
+     `is_relative_to` test; now a lexical check (`is_absolute() or ".." in parts`).
+
+### Decisions
+
+- **Training front end: `ko-loan`.** Checkpoint fingerprint matches Mode A exactly;
+  Mode B (`own`) serves via `infer.load_model(check_frontend=False)` — the documented
+  "same inventory, different conventions" escape hatch (EN ids 0–75 ⊂ 142 vocab).
+- **Reuse `annotations_full` for KSS**, self-align EN with espeak-CTC per V2 §3 (model
+  downloaded; revision matches v4's aligner exactly).
+- EN `--config` omitted in prepare/annotate → `Config()` defaults (F2/M2, vocab 0 →
+  76 under `own`) are the proven upstream settings; `config-v2.json` (KSS/F2/M2, 142)
+  is for the KSS prepare and the merged training only.
+
+### In flight / next
+
+- KSS features: 6-process `prepare` + `merge_features.py` → `features2/` (background,
+  ~22 min). Driver bug fixed: `split_shards.py` placeholder is `{index}`, not `{0}`.
+- Then: merge → subset → 800-step smoke train (`runs/smoke_v2`, GAN 300→600, teacher
+  released 200→400) → Mode A+B synthesis + ONNX parity → Phase 2 full.
+
+### Verified: KSS is 100 % pure Korean (gate design consequence)
+
+Probed all three `annotations_full` splits for ASCII in the transcript:
+**train 0/8504, validation 0/234, test 0/228**. The `ko` vs `ko-loan` front-end
+difference (Korean TN + loanword Jamo for English spans, see `korean.py
+phonemize_mixed`) therefore never fires on corpus text: every KSS row's annotated
+tokens are exactly what Mode A serving reproduces. The KO gate measured under
+`ko-loan` is numerically comparable to v1's `ko`-gate (11.8 % CER), with no
+code-mixing inflation. Code-mixing only appears in novel sentences and user text.
+
+### Gate commands (V2 §5), designed
+
+- **KO gate (Mode A)**: `TINY_VOCA_FRONTEND=ko-loan`,
+  `evaluate --annotations annotations_mixed --splits test` — merged manifest carries
+  the declared front-end sets, so KSS rows (`ko` fingerprint) load under `ko-loan`;
+  metric = `summary.test.KSS.generated_cer` ≤ 12.5 %. (`annotations_full` alone would
+  fail `data.py`'s strict single-front-end check under `ko-loan` — the merged manifest
+  is the intended entry point.)
+- **EN gate (Mode B)**: `TINY_VOCA_FRONTEND=own`,
+  `evaluate --annotations annotations_en --splits test --asr-model small --asr-language en`
+  (multilingual `small`; `small.en` is not in the HF cache) — metric =
+  `summary.test.all.generated_wer` ≤ 1.5 %.
+
+### `evaluate.py` v2 patches (suite re-run in flight)
+
+1. `load_model(..., check_frontend=False)` — the bilingual checkpoint stores one front
+   end (ko-loan); the EN gate run serves with the other (`own`) on the same inventory.
+2. `korean = frontend() in ("ko", "ko-loan")` — ko-loan selects the Korean ASR.
+(Per-row `tokens_match_annotation` left unconditional: it is only meaningful when the
+gate runs against the matching corpus manifest, as designed above.)
+
+### Smoke-merge plumbing: `--allow-incomplete`
+
+`annotate --limit` bakes `limit` into the identity and writes `"complete": false`;
+`merge_annotations.py` and `subset_manifest.py` now take `--allow-incomplete` for the
+deliberate smoke merge (merged manifest stays `complete: false`; the subset manifest
+is always `complete: true` — data.py requires it, and the subset verifies every `.pt`).
+
+### Phase 2 in flight
+
+- **KSS features** (background): 6 parallel `prepare` + merge → `features2/`.
+- **EN full pipeline** (background, launched concurrently): `prepare_en.py` (full
+  screen) → `data_en/` → split train into 6 → 8 parallel `prepare` → `features_en/`.
+  CPU-bound like KSS; both jobs share the 24 threads.
+
+### EN first wave died: 14-process storm, retry staggered
+
+The full EN screen passed cleanly — **9,254 rows kept** (train 7,976 / val 702 /
+test 576; drops were all `wer_too_high`: 250/16/20). But 7 of the 8 EN `prepare`
+children died within minutes (only `validation` finished). Forensics:
+
+- No native crash in the Windows Application log (no python.exe Application Error /
+  BEX entries) → clean Python-level exit; the traceback went to the void window
+  (`Start-Process` without redirection loses child output — the KSS driver has the
+  same blindness, its log shows only the parent's lines).
+- Each failed part dir held the 5 startup files (lock, manifest, rejected,
+  preparation.json, features.json) but **0 clips and 0 rejections** → death between
+  the metadata writes and the first clip; prime suspect is pyarrow mmap/commit
+  failure under the 14-process storm (6 KSS + 8 EN, ~1.3 GB working set each plus
+  torch VA), not per-row data.
+- Side discovery: `.venv\Scripts\python.exe` is a shim that re-execs the uv base
+  interpreter (`C:\Users\yuy\AppData\Roaming\uv\python\cpython-3.11-…\python.exe`);
+  the parent stays idle (1 MB, 0 % CPU) — every "one" prepare job is really a
+  parent+child pair, so the true process count was higher than the driver thought.
+
+**Fix:** `build_features_en_full2.ps1` waits for `features2/` to finish (KSS job
+first), then runs the 8 EN parts on a quiet CPU with
+`Start-Process -RedirectStandardOutput/-RedirectStandardError` per child so any
+error is captured (`logs_en_parts/<part>.err`), and dumps those tails on failure.
+`train-0` resumes via `--resume` (187 clips journaled by a foreground probe).
+
+### The storm also bit KSS: 9 MemoryError rejections, resumed clean
+
+The first EN wave's 14-process storm was not the only victim: the KSS job finished
+at **12 203 / 320 / 322** instead of 12 210 / 322 / 322. All 9 rejections were
+`MemoryError: Unable to allocate …` — transient commit exhaustion, not data. Fix
+(`resume_kss_parts.ps1`): strip the MemoryError records from the parts'
+`*.rejected.jsonl` journals (so `--resume`'s `done` set releases the clips),
+re-run `prepare --resume` **sequentially** (one child at a time on top of the 8
+active EN children — 14 was the failure count), re-merge. All 9 clips accepted:
+**features2 = 12 210 / 322 / 322, rejected 0**. Two driver bugs found on the way:
+`Path.glob()` returns a generator in 3.11 (`+` between them raised TypeError,
+silently skipping the cleanup), and the validation shard lives in `data/`, not
+`data_parts/` (only train was split).
+
+Final proof (`probe_features2_coverage.py`): for every split the id sets of
+`annotations_full` (accepted + rejected) and `features2` match exactly, and every
+manifest row's `.pt` file exists — **PASS**. `annotations_full` reuse is safe.
+
+### Smoke train: output-dir collision fixed, re-running
+
+`train.py` requires `--output` to be empty, but the subset driver had written
+`runs/smoke_v2/manifest/` — inside the train output dir. Moved the subset to
+`annotations_mixed_smoke/subset/` (beside the merged manifest it derives from);
+merge/subset are idempotent and deterministic (seed 42), so the whole driver was
+re-run. First merge output: **8,604 / 334 / 328** rows = KSS accepted
+(8,504/234/228) + EN smoke (100×3).
+
+### Smoke train ✅ — 800 steps, no NaN, both modes synth OK
+
+60/20/20 subset (fingerprint `ff1c5180…`), 800 steps in **127.75 s**
+(~10.5 steps/s pre-GAN, ~5.5 with GAN), base_loss 41.99 → 13.54, no NaN.
+GAN engaged from step 350; teacher released 200→400 (fraction 1.0→0.0);
+validation logged at 200/400/600/800 — at 800: predicted_mel 1.14,
+pause_accuracy 0.931, duration_length_ratio 1.06, pitch_spread_ratio 0.95.
+Checkpoint probe: `inference.pt` step 800, **4,550,347 params** (v1: 4,549,579 —
+the +768 is the 2 extra speaker embeddings, 3 voices × 256-dim vs 1), all finite;
+`last.pt` 21.7 M training-side params, all finite. Step checkpoints saved at
+300/400/800.
+
+Synthesis (`smoke_synth_v2.py`, Mode A `ko-loan`/KSS + Mode B `own`/F2,M2):
+6/6 cases, peaks 0.42–0.61 (no clipping), durations 3.0–6.0 s, `verify_wavs.py`
+all OK (24 kHz mono, RMS 0.079–0.105). Code-mixed case a3 (Python/USB/10km)
+tokenized cleanly under `ko-loan`. (Artifacts are 800-step smoke output —
+expected to sound rough; the gates below prove the machinery, not the voice.)
+
+ONNX parity (`check_onnx.py` under `ko-loan`, both graphs 21.4 MB):
+**durations exact on all 5 sentences** (incl. the code-mixed `Python` one),
+min correlation **0.9922** (noise realisation differs, peak 0.126), strict
+`--external-noise` graph fed the torch noise reproduces the waveform to a peak
+of **8.7e-4** (≈ −61 dB) → **OK**.
+
+**Smoke stage complete** — every v2 stage (prep, alignment, merge, train, synth
+Mode A+B, ONNX export/parity) has run end-to-end on the mixed manifest.
+
+### EN gate: `--serve-frontend` — the bilingual-checkpoint serving constraint
+
+Dry-run of the EN gate (Mode B, `own` inventory) against the smoke checkpoint
+exposed the constraint the patch is for: the v2 checkpoint embeds a 142-token
+config, and `Config.__post_init__` validates `vocab_size == len(SYMBOLS)` against
+the **active** front end — so the checkpoint can only *load* under `ko`/`ko-loan`
+(142), never under `own` (76). Fix in `evaluate.py`: new `--serve-frontend`
+option — load under the training front end, then `set_frontend()` after data
+loading and before synthesis. Sound because `own`'s 76 tokens are the exact
+prefix of `UNIFIED_VOCAB` (vocab.py: "every id produced by dizione.phonemize is
+valid in both"). The EN gate therefore runs `TINY_VOCA_FRONTEND=ko-loan
+evaluate --serve-frontend own` on a **merged-manifest** slice (`gate_manifest.py`
+filters F2/M2 rows from `annotations_mixed`; single-run `annotations_en` would
+fail data.py's strict check under the ko-loan process). Verified on the smoke
+checkpoint: 100 EN rows, **`frontend_token_mismatches: 0`** — the serve switch
+reproduces the espeak-CTC tokens exactly.
+
+Gate runners: `scripts/run_v2_gates.ps1` (KO: KSS-filtered merged manifest,
+`--per-voice 300 --novel 0`, metric `summary.test.KSS.generated_cer` ≤ 0.125;
+EN: F2/M2-filtered merged manifest + serve-frontend, `--per-voice 600`,
+`summary.test.all.generated_wer` ≤ 0.015; writes `verdict.json`). `gate_watcher_v2.ps1`
+parks alongside training, waits for `runs/v2/inference.pt` to reach each
+decision step (rewritten atomically every 2000 steps), pins a copy, gates it —
+with a CPU retry if the CUDA gate fails (VRAM headroom check).
+
+### `Start-Process` exit codes are broken in this environment
+
+The EN wave-2 driver reported 8/8 failures — two children had actually finished
+all 1330 clips. Experiment: `sys.exit(3)` via `Start-Process -PassThru` reports
+**ExitCode 1** (even the raw uv interpreter; even with `-Wait`); with
+`-RedirectStandard*` it is **null**. Foreground `& exe; $LASTEXITCODE` is exact
+(7, 9, 3 all propagated) — including through the venv shim. So: child processes
+are only launchable via Start-Process (for redirection) when success is verified
+by **output state**, never by exit code. Wave-3 driver verifies each `prepare`
+child by the JSON summary line it writes to the captured stdout, and does all
+merge steps in the foreground.
+
+### EN wave-2 driver bugs (captured for the record)
+
+1. Malformed condition `$p -ne "train-1" -ne "train-2" …` — chained `-ne` without
+   operands parses as `$p -ne "train-1" -ne "train-2"` = `($p -ne "train-1") -ne
+   "train-2"`, a bool-vs-string comparison whose result is unpredictable
+   (train-2…5 got `--split train-2` etc.; train-0/1/validation/test happened to
+   pass the broken test by accident).
+2. `validation`/`test` parts referenced `data_parts_en\*.parquet` — only the
+   train shard was split; those two are single shards in `data_en/`.
+3. The `$p: $line` string — `$p:` parses as a drive-qualified variable reference
+   (InvalidVariableReferenceWithDrive); the script died at parse, nothing ran.
+
+Wave 3 (running): the remaining 6 parts in two waves of three (3 prepares ≈ 12
+real processes incl. shim re-exec — under the 14-process storm threshold),
+sentinel-verified.
+
+### EN features complete — Phase 2 training launched
+
+Wave 3 finished all 6 remaining parts first-try, **0 rejections**: features_en =
+**7,976 / 702 / 576** (4.87 GB, every manifest row has its .pt). Three-at-a-time
+confirm the storm threshold: the 14-process first wave lost 7 children, 6×
+single-process sequential resume lost nothing.
+
+Launched:
+- **Main chain** `run_v2_full.ps1`: full EN annotate (espeak-CTC, GPU, ~15 min)
+  → merge (re-points `features_mixed/en` → `features_en`) →
+  `train_full.ps1 -Steps 160000 -Frontend ko-loan -Config config-v2.json`
+  (~14 h at v1's ~3.1 steps/s, 4-hour resumable chunks).
+- **Gate watcher** `gate_watcher_v2.ps1`: pins `runs/v2/inference.pt` at the
+  80k and 120k decision steps (rewritten atomically every 2000 steps) and runs
+  the bilingual gates on it; CPU retry if the CUDA gate fails (VRAM headroom
+  against the live training job).
+
+### D1 warm-start contingency staged
+
+`scripts/build_warm_snapshot.py` (new) rebuilds the training-format snapshot
+V2_SPEC D1 needs from v1's slim `runs/full/inference.pt`: `--init-from` reads
+`system`/`critics`/`optimizer`/`critic_optimizer`/`recipe`, and its strict
+config check rejects v1's KSS-only config — so the snapshot embeds config-v2,
+v1 generator weights under the `model.` prefix (as-is; `load_compatible`
+places them at branch start), fresh critics + critic moments (the branch logic
+takes trained critics over when step > gan_start, so these fresh v2 ones are
+what the warm run inherits — GAN scaling tolerates it), step 130000, v1
+frontend/annotation fingerprints (started with `--new-data`). Verified against
+the real v1 checkpoint: **182 exact, 2 grown** (`model.voices.weight` +
+`model.frame_voices.weight` (1,192)→(3,192) — the +768 params over v1),
+`mel_head` new, 0 dropped → `eval/v2/warm-snapshot.pt` ready. The warm run is
+then `train.py --init-from eval/v2/warm-snapshot.pt --new-data --output
+runs/v2-warm …` with the train_full recipe, 130k→160k.
+
+### Gate machinery built and dry-run verified
+
+`scripts/run_v2_gates.ps1`: bilingual gates for one inference checkpoint.
+KO gate = KSS rows only (`gate_manifest.py` filters the merged manifest's
+test split, keeping the parent's declared front-end/annotation sets so
+data.py accepts the rows; `complete: True` forced — every row is a verified
+copy), served under `ko-loan` with Korean ASR, `--per-voice 300 --novel 0`
+(228 KSS rows → all), metric `summary.test.KSS.generated_cer` ≤ 0.125.
+EN gate = F2+M2 rows, same mechanism, served under `own` with English ASR
+(`--serve-frontend own` — see below), `--per-voice 600` (576 rows → all),
+metric `summary.test.all.generated_wer` ≤ 0.015. Writes `verdict.json`.
+
+**EN gate constraint discovered (dry-run):** the v2 checkpoint embeds a
+142-token config; `Config.__post_init__` validates `vocab_size` against the
+**active** front end, so it only *loads* under `ko`/`ko-loan`, never `own`
+(76). Fix in `evaluate.py`: new `--serve-frontend` option — load under the
+training front end, then `set_frontend()` after data loading, before
+synthesis. Sound because `own`'s 76 tokens are the exact ID-prefix of
+`UNIFIED_VOCAB` (vocab.py: "every id produced by dizione.phonemize is valid
+in both"). EN gate therefore runs `TINY_VOCA_FRONTEND=ko-loan
+evaluate --serve-frontend own` on a **merged-manifest** slice (single-run
+`annotations_en` would fail data.py's strict check under ko-loan). Dry run on
+the smoke checkpoint: 100 EN rows, `frontend_token_mismatches: 0` — the serve
+switch reproduces the espeak-CTC tokens exactly.
+
+`gate_watcher_v2.ps1`: runs alongside training, waits for
+`runs/v2/inference.pt` to reach each decision step (80k/120k; the file is
+rewritten atomically every 2000 steps, so a copy pinned then is a complete
+checkpoint), pins it, runs the gates — CUDA, with a CPU retry if the gate
+fails (VRAM headroom against the live training job).
+
+### EN annotate + merge complete, full training started (12:01)
+
+Full EN annotate (espeak-CTC, `own` front end): **complete in 3.3 min** —
+train 7,947/7,976 (29 rejected: vowels_not_voiced 24, weak_alignment 4,
+low_confidence 2), validation 699/702, test 574/576. Per-voice timing probe
+healthy (within-2-frames ≥ 0.81 on both boundary classes, both voices).
+Merge (re-pointed `features_mixed/en` → `features_en`): `annotations_mixed`
+fingerprint `3b930c46d7498d22` → **train 16,451** (KSS 8,504 + EN 7,947) /
+**validation 933** (234 + 699) / **test 802** (228 + 574).
+
+Training (`train_full.ps1 -Steps 160000 -Output runs\v2 -Frontend ko-loan`,
+4-hour resumable chunks): at step 4,650, 13.97 steps/s, loss 9.22 — v1's log
+shows the identical trajectory (14.10 s/s at step 5k, dropping to ~3.2 s/s
+after GAN starts at 8k). ETA: **80k ~18:30, 120k ~22:00, 160k ~01:15 (Nov 19)**.
+
+### Pre-gate staging (12:30)
+
+- **EN gate ASR switched to `small.en`** — V2_SPEC §5 names small.en explicitly;
+  downloaded + load-tested now (was `small --asr-language en` to dodge a
+  mid-run download).
+- **`scripts/battery_v2.py`** (new) — the §5 listening batteries, imported from
+  the P1 golden tables so the expected readings are the locked contract:
+  number battery 20 cases (counters/phones/dates/percent) + loanword battery
+  20 words, Mode A KSS, text-level pre-check (must match 182/182 discipline)
+  then synthesis + Whisper-ko CER as an automatic proxy for listening.
+- **`scripts/listening_v2.py`** (new) — 16-case Mode A+B listening set for the
+  final checkpoint (greetings, numbers, code-mix, flow, questions, stress).
+- **20k trend probe job launched** (spec P3 "checkpoint probes at 20k/80k/120k";
+  80k/120k are the gate watcher's): pins `inference.pt` at ≥ 20000 and speaks
+  one Korean (KSS, ko-loan) + one English (F2, own) sentence to
+  `eval/v2/probe-20000/`.
+- Q3 (160k vs 190k step budget) is decided at the 120k gate from CER/WER trends.
+- P5 (browser demo) scope checked: `worker.js` needs mode A/B phonemisation
+  routing (kofront exposes `phonemize_mixed(text, mode)`), voice selection
+  KSS/F2/M2, re-export of model.onnx under `ko-loan`, `VERSION` bump; parity via
+  `check_onnx.py` + `check_shim.py`. Starts after the final gate passes.
+
+## 2026-11-18 ≈14:30 — P5 demo code complete + `--serve-frontend` regression tests (training: step 18 000)
+
+### Browser demo (P5) code complete — validation at final gate
+
+- `worker.js`: speak messages now carry `voice?`/`mode?`; voice→mode per
+  V2_SPEC §0 (KSS → `ko-loan` Mode A, F2/M2 → `own` Mode B, explicit `mode`
+  overrides). The Pyodide phonemiser now calls `ktext.set_frontend(mode)` +
+  `ktext.phonemize(text)` — the single faithful dispatch (`ko`/`ko-loan` →
+  `phonemize_mixed`, `own` → dizione path), exactly the path the annotations
+  used. Deliberately **not** `phonemize_mixed(text, "own")` directly: it differs
+  from the standard path on punctuation sequences (quote+comma inserts other
+  spacing — 4 of 10 EN corpus sentences differ), which would break the EN gate's
+  `frontend_token_mismatches: 0` property. `synthesize` now takes the voice
+  index (position in `config.voices`); `fit` threads the mode through its
+  recursion.
+- `index.html`: voice `<select>` populated from the worker's `ready.voices`;
+  examples carry their voice (6 KSS Mode A + F2/M2 Mode B sentences); bilingual
+  header/footer copy; facts grid carries the v2 structure (4,550,347 params,
+  3 voices, 142 tokens, 160 000 steps) with `<!-- PUBLISH -->` markers for the
+  ONNX size, elapsed training time, and the final gate numbers.
+- Validated so far: `node --check` on both scripts (node v23); the worker's
+  exact runPython block replayed in the venv — 11/11 checks passed (both modes
+  phonemise, repeated `set_frontend` switches stable, the `own` path
+  byte-identical to the annotations' `phonemize()` under `own`, ids inside the
+  142-token vocab, `own` ids < 76). `VERSION` still "1" and no assets changed
+  yet — publish step (after the final gate): re-export `model.onnx` under
+  `TINY_VOCA_FRONTEND=ko-loan`, bump VERSION, `check_onnx.py`, `check_shim.py`.
+
+### Regression tests for the `--serve-frontend` mechanism
+
+- `tiny-voca/tests/test_frontend_serve.py` (new, 5 tests): (1) the motivating
+  failure — `Config(vocab_size=142)` only builds while a 142-token front end is
+  active; (2) a bilingual checkpoint loads only under the training front end
+  (`check_frontend=False` doesn't help: `Config.__post_init__` rejects the
+  vocab before the fingerprint is ever compared); (3) the gate order — load
+  under `ko-loan`, `set_frontend("own")`, `speak()` gives finite audio with
+  ids < 76 only, F2's voice index = 1, and the switch reverses back to Korean;
+  (4) the two modes phonemise the two corpora into disjoint id ranges (the
+  worker's routing property); (5) ASR defaults — `ko`/`ko-loan` → (small, ko),
+  `own`/`espeak` → (small.en, en).
+- `evaluate.py`: extracted `asr_defaults(frontend_name)` (behaviour identical;
+  the inline logic was untestable).
+- Suite: **257 OK, 2 skipped** (252 baseline + 5 new).
+
+### Latent test-suite quirk discovered (documented, not fixed)
+
+- `TinyVoca(config=Config())` freezes its default config at **import time**,
+  and `test_ko_en_frontend.py` does
+  `os.environ.setdefault("TINY_VOCA_FRONTEND", "ko")` at import and restores the
+  frontend from that same variable in `tearDownModule` — so running the suite
+  **without** the variable leaks the `ko` front end into `test_model`, where
+  `test_default_model_is_under_five_million_parameters` compares the
+  call-time `Config()` (142 tokens → 4 549 963) against `TinyVoca()`'s
+  import-time frozen config (76 tokens → 4 537 291) → failure.
+- The documented invocation (`$env:TINY_VOCA_FRONTEND="ko"` set first) makes
+  both sides 142, which is why the suite is green (257 OK). If variable-less
+  invocations ever become normal, the one-line hardening is `TinyVoca(Config())`
+  in that test.
+
+### Training progress
+
+- Step 18 000; post-GAN **3.73 steps/s** (faster than v1's 3.2 at the same
+  stage); ETA for 160k ≈ 01:10 Nov 19, in line with the original forecast.
+- The 20k trend probe should fire within minutes; 80k gate watcher parked.
+
+### Disk cleanup (user request — 20 GB free at training ~step 9k)
+
+Free space 20.3 → **36.3 GB** (+16 GB). Deleted, all consumed/re-derivable and
+verified unreferenced by the live training (manifest rows point at
+`ko/…`/`en/…` through the `features_mixed` junctions):
+
+- `features_w_en/` 4.87 GB — EN feature shards, merged into `features_en`
+- HF `datasets--Bingsu--KSS_Dataset` 3.63 GB — KSS audio, consumed by `data/`→`features2`
+- HF `models--kresnik--wav2vec2-large-xlsr-korean` 3.59 GB — KO aligner, annotation done
+  (v2 reuses `annotations_full`)
+- HF `datasets--n4ze3m--tiny-voca` 1.95 GB — EN audio, consumed by `data_en/`→`features_en`
+- `data_parts_en/` 0.94 GB — EN train shards, consumed by `features_en`
+- HF `models--facebook--wav2vec2-lv-60-espeak-cv-ft` 1.20 GB — EN aligner, annotation done
+- `runs/smoke_v2/` 0.37 GB — smoke checkpoints, stage complete (retrainable in 128 s)
+
+Kept: `features2/` + `features_en/` (live reads), `runs/v2/`, `runs/full/`
+(v1 baseline + D1 source), `data/` + `data_en/` (canonical re-prep input), all
+non-smoke `annotations_*`, Whisper small + small.en (gate ASR), `.venv`.
+If alignment is ever re-run, the two CTC aligners re-download (~4.8 GB).
+
+- Smoke train driver updated for `--allow-incomplete`; `train_full.ps1` carries
+  `-Frontend` (default `ko` preserves v1); recipe unchanged from v1 (batch 12000/48,
+  warmup 1000, half-life 100 000, GAN 8000/3000/0.7, teacher 3000/7000/0).
+

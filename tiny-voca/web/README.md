@@ -1,12 +1,12 @@
 # 데모 사이트 — `web/public`
 
-브라우저에서 한국어 TTS를 돌리는 정적 페이지입니다. 빌드 단계가 없고, `public/`의 파일 그대로를
+브라우저에서 이중 언어 TTS를 돌리는 정적 페이지입니다. 빌드 단계가 없고, `public/`의 파일 그대로를
 어느 정적 호스팅에 올리기만 하면 됩니다.
 
 | 파일 | 내용 |
 | --- | --- |
-| `index.html` | 한국어 페이지. 예문 6개, 빠르기·음높이 슬라이더, 합성 지표, 자모 보기 |
-| `worker.js` | 워커. Pyodide에서 `kofront`(g2pk + dizione)로 음소화, ONNX Runtime Web으로 추론 |
+| `index.html` | 이중 언어 페이지. 음성 선택기(KSS·F2·M2), 예문 8개, 빠르기·음높이 슬라이더, 합성 지표, 음소 보기 |
+| `worker.js` | 워커. Pyodide에서 `kofront`(g2pk + dizione)로 음소화 — 음성에 따라 모드 A(`ko-loan`, KSS)·모드 B(`own`, F2/M2) 선택 — ONNX Runtime Web으로 추론 |
 | `en.html`, `worker-en.js` | 업스트림의 영어 데모 (동일 구조, F2/M2 2음성) |
 | `404.html` | Pages/Cloudflare용 안내 페이지 |
 | `assets/` | 모델·사전·Python 패키지 (아래 표) |
@@ -19,22 +19,22 @@ cd C:\ai-workspace\korean-tts
 # http://127.0.0.1:8081/
 ```
 
-첫 방문 시 약 40 MB(모델 21.4 MB + 발음 사전 + Pyodide 런타임)를 받고, 두 번째 방문부터는
-Cache Storage에서 바로 시작합니다.
+첫 방문 시 약 40 MB(모델 <!-- PUBLISH: v2 ONNX size --> MB + 발음 사전 + Pyodide 런타임)를 받고,
+두 번째 방문부터는 Cache Storage에서 바로 시작합니다.
 
 ## 자산 다시 만들기
 
 ```powershell
-$env:PYTHONUTF8="1"; $env:TINY_VOCA_FRONTEND="ko"
+$env:PYTHONUTF8="1"; $env:TINY_VOCA_FRONTEND="ko-loan"   # v2:双语 체크포인트는 ko-loan 어휘로 내보낸다
 $env:DIZIONE_DATA="C:\ai-workspace\korean-tts\weights\phonemizer"
 
 .\.venv\Scripts\python.exe scripts\build_mecab_dict.py      # 형태 분석 사전 (MeCab 분석 기록)
-.\.venv\Scripts\python.exe scripts\build_web_assets.py      # assets/ 전체 조립 (ONNX 포함은 --export)
+.\.venv\Scripts\python.exe scripts\build_web_assets.py --checkpoint runs\v2\inference.pt --export
 ```
 
 | 자산 | 크기 | 출처 |
 | --- | --- | --- |
-| `model.onnx`, `config.json` | 21.4 MB | `runs/full/inference.pt` → `python -m tiny_voca.export` |
+| `model.onnx`, `config.json` | <!-- PUBLISH: v2 ONNX size --> MB | `runs/v2/inference.pt` → `python -m tiny_voca.export` |
 | `phonemizer/` | 6.3 MB | `weights/phonemizer` (dizione) + NLTK `cmudict.zip` |
 | `mecab-dict.json` | 0.95 MB | 학습 스플릿 12 210문장의 MeCab 분석 (20 649 어절) |
 | `pyfront.zip` | 0.04 MB | g2pk + jamo + `kofront`(vocab/text/korean) + `mecab.py` shim |
@@ -59,10 +59,14 @@ $env:DIZIONE_DATA="C:\ai-workspace\korean-tts\weights\phonemizer"
 * **Cloudflare Pages** — `web/wrangler.jsonc`를 사용 (`npx wrangler pages deploy public`).
 * **임의의 정적 호스팅** — `public/`을 복사하면 끝. WASM용 응답 헤더는 기본값으로 충분합니다.
 
-## 게시본 실측 (headless Chrome, 2026-11-16)
+## 게시본 실측 (headless Chrome)
 
 `main`에 푸시하면 워크플로우가 게시합니다. 게시 뒤 예문 칩을 눌러 합성까지 돌린 실측값
 (상태 줄이 `완료.`가 되고 `#result`의 `<audio>`가 채워지는 것까지 확인):
+
+<!-- PUBLISH: v2 published-site measurement replaces the v1 table below (2026-11-16) -->
+
+v1 (2026-11-16):
 
 | 예문 | 오디오 | 합성 벽시계 | 배 실시간 | 음소 분석 |
 | --- | --- | --- | --- | --- |
@@ -77,7 +81,8 @@ $env:DIZIONE_DATA="C:\ai-workspace\korean-tts\weights\phonemizer"
 
 ## 알려진 한계
 
-* 영어 음성(68개 음소)은 KSS에 없어 학습되지 않았습니다 — 앞부분은 정확히 읽습니다.
+* 세 음성은 각각의 코퍼스로 학습되었습니다: KSS는 한국어(영어 차용어는 모드 A 한국식 발음),
+  F2·M2는 영어. 음성을 바꾸면 프론트엔드도 따라 바뀝니다(음성 = 모드).
 * 형태 분석 shim은 코퍼스 사전에 없는 어절에서 규칙 하나를 다르게 선택할 수 있습니다.
 * 합성은 WASM 단일 스레드에서 실시간의 약 10~17배로 동작합니다 (4초 문장 ≈ 0.3~0.4초).
   첫 문장은 워밍업으로 이보다 느립니다.

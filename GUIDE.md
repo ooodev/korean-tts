@@ -88,9 +88,9 @@ Check the result:
 
 ## 3. The browser demo
 
-**[ooodev.github.io/korean-tts](https://ooodev.github.io/korean-tts/)** runs the same model
-in the page: ONNX Runtime Web for the graph, Pyodide for the phonemizer, so the text never
-leaves the device. Serve it locally with
+**[ooodev.github.io/korean-tts](https://ooodev.github.io/korean-tts/)** runs the bilingual model
+in the page — KSS speaks Mode A (ko-loan), F2/M2 speak Mode B (own) — with ONNX Runtime Web
+for the graph and Pyodide for the phonemizer, so the text never leaves the device. Serve it locally with
 
 ```powershell
 .\.venv\Scripts\python.exe -m http.server 8081 --directory tiny-voca\web\public  # http://127.0.0.1:8081/
@@ -104,7 +104,7 @@ sentences).
 
 | | |
 | --- | --- |
-| Model | `model.onnx` 21.4 MB, exported from `runs/full/inference.pt` |
+| Model | `model.onnx` (<!-- PUBLISH: v2 ONNX size --> MB), exported from `runs/v2/inference.pt` under `TINY_VOCA_FRONTEND=ko-loan` |
 | Phonemizer | `pyfront.zip` ??g2pK + jamo + `kofront` (the same `vocab/text/korean.py`) + dizione |
 | Morphology | `mecab-dict.json` ??20 649 corpus eojeols with their real MeCab analyses |
 | Measured in Chrome | published site: 4.7 s of audio in 0.28 s (16.9× real time); locally 3.6 s in 0.37 s (9.7횞 real time), phonemization 186 ms |

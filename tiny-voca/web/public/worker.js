@@ -1,11 +1,15 @@
-// Korean front end + ONNX model, off the main thread.
+// Bilingual front end + ONNX model, off the main thread (v2.0).
 //
-// Messages in: {type: "load"} and {type: "speak", id, text, speed, pitchShift, pitchRange}.
+// Messages in: {type: "load"} and {type: "speak", id, text, speed, pitchShift, pitchRange,
+//               voice?, mode?}. ``voice`` is a name from config.voices (default "KSS");
+//               ``mode`` is "ko-loan" or "own" and defaults from the voice: KSS speaks
+//               Mode A (ko-loan, Korean with Korean-style numerals and loanword G2P),
+//               F2/M2 speak Mode B (own, native English, dizione IPA).
 // Messages out: status, ready, sentence, done, error.
 //
 // The phonemizer is the same Python the model was trained on: kofront (the
-// tiny-voca Korean front end) drives g2pK for Korean spans and dizione for
-// English spans, so a code-mixed sentence is tokenised exactly as in training.
+// tiny-voca front end) drives g2pK for Korean spans and dizione for English
+// spans, so a code-mixed sentence is tokenised exactly as in training.
 // g2pK needs a morphological analyser; python-mecab-ko has no WASM build, so
 // mecab.py (a pure-Python stand-in plus a dictionary of the corpus analyses)
 // stands in for it. The model is the exported free-running graph: tokens and
@@ -85,14 +89,17 @@ os.environ["MECAB_DICT"] = "/pyfront/mecab-dict.json"
 sys.path.insert(0, "/pyfront")
 import nltk
 nltk.data.path.insert(0, "/nltk_data")
-from kofront.korean import phonemize_mixed
+from kofront import text as ktext
 
-def phonemize_json(text):
-    result = phonemize_mixed(text)
+def phonemize_json(text, mode):
+    # ktext.phonemize dispatches exactly like training: "ko"/"ko-loan" ->
+    # phonemize_mixed (g2pK + dizione loanwords), "own" -> the dizione IPA path.
+    ktext.set_frontend(mode)
+    result = ktext.phonemize(text)
     return json.dumps({"ids": list(result.ids), "stress": list(result.stress),
                        "symbols": list(result.symbols), "unknown": list(result.unknown)})
 
-phonemize_json("테스트 문장입니다.")
+phonemize_json("테스트 문장입니다.", "ko-loan")
 `);
   phonemize = pyodide.globals.get("phonemize_json");
 }
@@ -122,30 +129,38 @@ function sentences(text) {
 
 // One utterance holds at most max_tokens tokens; longer sentences are cut at
 // commas, then in half.
-function fit(sentence) {
-  const result = JSON.parse(phonemize(sentence));
+function fit(sentence, mode) {
+  const result = JSON.parse(phonemize(sentence, mode));
   if (result.ids.length <= config.max_tokens - 12) return [result];
   const pieces = sentence.split(/(?<=[,;:—])\s+/);
-  if (pieces.length > 1) return pieces.flatMap(fit);
+  if (pieces.length > 1) return pieces.flatMap((piece) => fit(piece, mode));
   const words = sentence.split(" ");
   if (words.length < 2) return [];
   const half = Math.ceil(words.length / 2);
-  return [...fit(words.slice(0, half).join(" ")), ...fit(words.slice(half).join(" "))];
+  return [...fit(words.slice(0, half).join(" "), mode), ...fit(words.slice(half).join(" "), mode)];
 }
 
-async function synthesize(phones, speed, pitchShift, pitchRange) {
+async function synthesize(phones, voiceIndex, speed, pitchShift, pitchRange) {
   const count = phones.ids.length;
   const integers = (values) => new ort.Tensor("int64", BigInt64Array.from(values.map(BigInt)), [1, count]);
   const scalar = (value) => new ort.Tensor("float32", Float32Array.from([value]), [1]);
   const output = await session.run({
     tokens: integers(phones.ids), stress: integers(phones.stress),
-    voice: new ort.Tensor("int64", BigInt64Array.from([0n]), [1]),
+    voice: new ort.Tensor("int64", BigInt64Array.from([BigInt(voiceIndex)]), [1]),
     speed: scalar(speed), pitch_shift: scalar(pitchShift), pitch_range: scalar(pitchRange),
   });
   return { audio: output.audio.data, durations: output.durations.data };
 }
 
-async function speak({ id, text, speed, pitchShift, pitchRange }) {
+// V2_SPEC §0: the Korean corpus voice speaks Mode A (ko-loan), the English
+// corpus voices speak Mode B (own).
+const defaultMode = (voice) => voice === "KSS" ? "ko-loan" : "own";
+
+async function speak({ id, text, speed, pitchShift, pitchRange, voice, mode }) {
+  const voiceName = voice || config.voices[0];
+  const voiceIndex = config.voices.indexOf(voiceName);
+  if (voiceIndex < 0) throw new Error(`unknown voice: ${voiceName}`);
+  const speakMode = mode || defaultMode(voiceName);
   const started = performance.now();
   const list = sentences(text);
   const chunks = [];
@@ -153,11 +168,11 @@ async function speak({ id, text, speed, pitchShift, pitchRange }) {
   let modelTime = 0;
   for (let index = 0; index < list.length; index++) {
     let mark = performance.now();
-    const utterances = fit(list[index]);
+    const utterances = fit(list[index], speakMode);
     phonemeTime += performance.now() - mark;
     for (const phones of utterances) {
       mark = performance.now();
-      const audio = (await synthesize(phones, speed, pitchShift, pitchRange)).audio;
+      const audio = (await synthesize(phones, voiceIndex, speed, pitchShift, pitchRange)).audio;
       modelTime += performance.now() - mark;
       chunks.push(audio);
       postMessage({ type: "sentence", id, index, total: list.length,
