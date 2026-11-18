@@ -131,6 +131,89 @@ $env:MECAB_DICT="C:\ai-workspace\korean-tts\tiny-voca\web\public\assets\mecab-di
 .\.venv\Scripts\python.exe scripts\check_shim.py --sentences 644   # shim == MeCab, held-out splits
 ```
 
+## Further training — growing KSS's style repertoire (tips)
+
+The v2 model sits at its data's sweet spot: 4.55 M params, 18.13 h (KSS 8.45 h + F2 5.07 h +
+M2 4.61 h), 160 k steps. KO CER is saturated against the ASR floor (human KSS audio scores
+5.70 % on the same 228-sentence test split; generated audio 5.35 %). More steps or a bigger
+model on the same pool will not move that metric. The remaining gains are **style dimensions
+the data never covered**, added as **new KSS data + continued training**.
+
+### Style dimensions (priority order)
+
+| Dimension | Today | How to grow it |
+| --- | --- | --- |
+| Korean numerals (dates, amounts, temps, populations) | strong — TN + KSS rows; part of the CER error mass on numerals is ASR, not TTS | optional 30–60 min of KSS numeral sentences; judge by ear, not CER |
+| English → Korean-style loanwords (every English span) | Mode A + `tiny-voca/src/tiny_voca/data/loanwords.tsv` (462 entries); OOV fallback otherwise | **grow the dictionary first (zero training cost)**; then record code-mixed sentences so co-articulation comes from real audio |
+| Special characters / punctuation (read naturally or skip) | g2pk + TN cover the common cases | add punctuation-heavy rows to the new pool; 0-`<unk>` front-end gate before training |
+| Emotion / expression | weakest — KSS corpus is one calm style; 2 prosody layers + pitch/energy conditioning exist | only real KSS recordings in varied styles; VC/resynthesis can't fake breathing & micro-dynamics |
+
+### Data strategy (best → worst)
+
+1. **Real KSS recording** — keeps the timbre pure. Calibrate to F2: **~5 h of KSS English** =
+   3–4 h English + ~1 h code-mixed + 30–60 min numerals. 24 kHz mono, clean. New recordings
+   need speaker consent and keep the CC BY-NC-SA chain.
+2. **Voice conversion** (F2/M2 English → KSS timbre) — workable; expect breathing/fine-prosody
+   artifacts.
+3. **Relabel F2 rows as KSS — rejected**: one speaker embedding cannot hold two timbres;
+   Korean output drifts toward a mix (classic multi-speaker failure mode).
+
+### Continued-training recipe (where compute gets wasted if done wrong)
+
+- `--init-from runs/v2/inference.pt --new-data <merged annotations>` — inherits weights + step
+  counter + GAN critics; new sampler. `--resume` is only for an identical pool.
+- LR keeps halving on its own (`0.5^(step/100000)`): 160 k ≈ ⅓ of base, 200 k = ¼ of base.
+  The low LR is what protects the old abilities — do not reheat.
+- Old data replays automatically: BucketSampler draws uniformly from the merged pool → with
+  +3 k new clips the old 16 451 still receive ≈85 % of every step.
+- **Pass-count math** (v2 recipe: 12 000 frames/batch = 128 s of audio): the old pool saw
+  ≈315 passes (160 k × 128 s ÷ 18.13 h). In +40 k steps on the merged pool every clip gets
+  ≈65–70 more draws, so a new 3 k-clip pool ends at **≈70 cumulative passes vs ≈380 for the
+  old abilities — ~1/5 of the exposure**. Fix, in ROI order:
+  1. **Up-sample the new clips 3–5× in the manifest** (duplicate rows before merging) →
+     ≈150–220 passes in the same 40 k steps, old data still gets ≈50;
+  2. more steps (160 k → 250 k ≈ +7 h on the 4090);
+  3. LR reheat — last resort, it shakes the old gate.
+- Tailwind: the acoustic decoder already encoded English from F2/M2 (≈300 passes); KSS English
+  is speaker-adaptation territory — the (KSS, English) mapping + the embedding, not English
+  itself — so it converges faster than from scratch.
+
+### Pipeline for a new KSS pool
+
+1. 24 kHz mono wavs → `prepare` into a **new** features dir (`--resume` keys on shard sha256).
+2. `annotate` with a **new `--output`** (identity rule) — `kalign` for Korean rows,
+   espeak-CTC for English rows, `units` kept for code-mixed rows; per-row QC (0 `<unk>`,
+   alignment ratio).
+3. Merge with the existing 16 451 rows (apply the up-sampling here) → smoke 100 clips /
+   500–1 000 steps → full run `--init-from` + `--new-data`, ~40 k step budget (≈3–4 h).
+4. Gate (below) → keep or roll back.
+
+### Keep / roll-back gates
+
+| Gate | Threshold | Why |
+| --- | --- | --- |
+| KO CER, 228-sentence split | 5.35 % ± 0.3 % | ASR floor ≈ 5.7 % — don't chase CER lower; just don't regress |
+| EN WER, KSS-English rows | ≤ 1.5 % | the new ability actually works |
+| pause_ratio | 1.16 → toward 1.0 | the measurable "extra pauses" trait; ASR-free |
+| duration_ratio / pitch_std | ≈0.975 / ≈5.0 st | no speech-rate or intonation drift |
+| Human listening battery | numeral / loanword / punctuation / emotion sentences | timbre drift + prosody — ears decide |
+
+`--init-from` starts a new run → `runs/v2` stays intact for rollback.
+
+### Route the front end before you record, not after
+
+KSS sends English spans through Mode A (loanword G2P: Python → 파이썬). If the new recordings
+use **native** English, add a mode routing English spans to dizione — otherwise the model
+learns what the front end refuses to render. "파이썬 or paɪθɑːn" is a product decision; the
+dictionary, `mecab-dict.json` and web-asset rebuilds (+ `VERSION` bump) follow it.
+
+### Capacity reality check
+
+4.55 M params is intentionally small (browser demo, ~21 MB ONNX). A few hours of data per
+speaker scales well for it; a 7 000 h multi-speaker corpus belongs to a larger model — at that
+scale the extra hours mostly mean "many voices", and 4.5 M cannot hold them. Don't buy hours
+expecting 400× gains.
+
 ## Phase status — v1.0 (Korean only, `runs/full`)
 
 | Phase | State | Gate |

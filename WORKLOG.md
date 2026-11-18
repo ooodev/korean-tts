@@ -1601,3 +1601,26 @@ bumped 4 → 5. Headless-Chrome check on the local server: 5×5 groups render,
 one chip per group taps to `완료.` with correct voice, caption and audio src
 set, 0 page errors. README + FINAL_REPORT_v2 chip counts updated.
 
+## 2026-11-18 ≈21:40 — README + AGENTS: further-training tips (KSS style repertoire)
+
+User asked for the distilled guidance on growing KSS's styles (numerals,
+Korean-style loanwords for every English span, special characters read or
+skipped, emotion) and training on them efficiently. Added a "Further
+training" section to `AGENTS.md` (operational recipe) and `README.md`
+(explanatory version). Content is the v2-analysis conclusions: CER is
+saturated at the ASR floor (5.70 % human vs 5.35 % generated) so gains come
+from data-gap styles, not steps/params; data ladder real KSS recording (~5 h,
+calibrated to F2's 5.07 h) > VC > relabel (rejected); mechanics
+`--init-from runs/v2/inference.pt --new-data`, LR half-life continues (160 k ≈
+⅓ base), BucketSampler ≈85 % auto-replay; pass-count math recomputed from the
+real v2 recipe (`runs/v2/recipe.json`: batch_frames 12 000 = 128 s/batch →
+old pool ≈315 passes; +40 k steps on the merged pool ≈65–70 draws/clip, so a
+new 3 k pool ends ≈1/5 of old exposure — fix by 3–5× manifest up-sampling
+(≈150–220 passes, best ROI), 250 k steps, or LR reheat (last resort)); keep/
+rollback gates (KO CER 5.35 % ± 0.3 %, EN WER ≤ 1.5 %, pause_ratio 1.16 → 1.0,
+duration_ratio/pitch_std, human listening battery); front-end routing
+decision (파이썬 vs paɪθɑːn) must precede recording; capacity reality check
+(4.55 M is browser-sized; 7 000 h multi-speaker belongs to a larger model).
+Note: the ≈10-pass figure quoted mid-conversation was computed on a wrong
+batch-size assumption; the docs carry the corrected ≈70.
+
