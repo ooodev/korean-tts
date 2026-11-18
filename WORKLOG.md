@@ -1319,6 +1319,56 @@ after GAN starts at 8k). ETA: **80k ~18:30, 120k ~22:00, 160k ~01:15 (Nov 19)**.
   stage); ETA for 160k ≈ 01:10 Nov 19, in line with the original forecast.
 - The 20k trend probe should fire within minutes; 80k gate watcher parked.
 
+### 20k trend probe — green (~14:42)
+
+`inference.pt` pinned at step 20 000 (18.3 MB); both serving modes synthesised
+finite, healthy audio at 12.5 % of training: `ko.wav` 6.46 s (peak 0.65, rms
+0.07, KSS/ko-loan) and `en.wav` 3.24 s (peak 0.84, rms 0.13, F2/own). The
+Mode A + Mode B inference paths the final gates use are sound.
+
+Also this window: `scripts/publish_v2_demo.ps1` (new, parse-verified) automates
+the post-gate publish steps (mecab dict → assets+export → strict export →
+VERSION bump → `check_onnx.py` → `check_shim.py`); `FINAL_REPORT_v2.md`
+scaffolded with PUBLISH markers; verified work committed as
+`c88719a` (28 files: ko-loan front end, EN data pipeline, gate machinery, P5
+demo code, docs).
+
+## 2026-11-18 ≈13:45 — Gate watcher incident: `run_v2_gates.ps1` parse error (fixed, gates re-running)
+
+### What happened
+
+The gate watcher pinned `inference.pt` at step 80 000 and step 120 000
+(correctly, before each gate run) but the gate itself never executed:
+`powershell -File scripts\run_v2_gates.ps1` died with a ParserError
+(`InvalidLeftHandSide` at the param block). Both the CUDA run and the CPU
+fallback failed identically; the watcher logged `GATE_WATCHER_DONE`.
+
+### Root cause
+
+`run_v2_gates.ps1` opened with a Python-style docstring (`"""…"""`,
+lines 1-13). PowerShell 5.1 parses the first `""` as an empty string, the
+third `"` as the start of a multi-line string, and the param block's token
+state is corrupted by the time it is reached. The parser API confirms the
+errors at 15:27…20:25. The earlier "dry-run verified" note covered the gate
+logic (manifests, `--serve-frontend` evaluate, verdict math) but not the
+PowerShell parse — lesson: **parse-verify every .ps1 with the Parser API**
+(done for `publish_v2_demo.ps1` and now for this one; `train_full.ps1` was
+clean).
+
+### Fix + recovery
+
+- Docstring → `#` comment block; `run_v2_gates.ps1` now parses clean.
+- The pinned checkpoints are the decision artifacts (slim format,
+  18 262 661 B each): `eval/v2/gate-80000/inference.pt`,
+  `eval/v2/gate-120000/inference.pt`. Training kept running through the
+  incident (step ≈ 121 000 at 13:45, ~3.4 steps/s).
+- Re-running both gates on the pinned checkpoints, 120k first (D1 decision:
+  KO CER ≤ 12.5 %, EN WER ≤ 1.5 %), then 80k (reference trend) — background
+  job, `logs_v2_gate_rerun.txt`. Decision on completion: KO CER > 12.5 % at
+  120k → D1 warm-start branch (stop chain, `--init-from eval/v2/warm-snapshot.pt`);
+  otherwise continue to 160k and decide Q3 (160k vs 190k) from the
+  80k→120k CER/WER trend.
+
 ### Disk cleanup (user request — 20 GB free at training ~step 9k)
 
 Free space 20.3 → **36.3 GB** (+16 GB). Deleted, all consumed/re-derivable and

@@ -1,16 +1,15 @@
-"""V2 bilingual gates (V2_SPEC section 5): KO CER on KSS test rows (Mode A) and
-EN WER on the English test split (Mode B) for one inference checkpoint.
-
-The KO gate serves the ko-loan front end on the KSS-filtered merged manifest
-(single-run annotations_full would fail data.py's strict check under ko-loan);
-the EN gate serves the own front end on annotations_en with the English ASR.
-Both checkpoints are loaded with check_frontend=False (bilingual checkpoint
-stores one front end; the gates deliberately serve the other).
-
-    powershell -File scripts/run_v2_gates.ps1 -Checkpoint runs/v2/inference.pt -Tag gate-80000
-
-Thresholds: KO generated_cer <= 0.125, EN generated_wer <= 0.015.
-"""
+# V2 bilingual gates (V2_SPEC section 5): KO CER on KSS test rows (Mode A) and
+# EN WER on the English test split (Mode B) for one inference checkpoint.
+#
+# The KO gate serves the ko-loan front end on the KSS-filtered merged manifest
+# (single-run annotations_full would fail data.py's strict check under ko-loan);
+# the EN gate serves the own front end on annotations_en with the English ASR.
+# Both checkpoints are loaded with check_frontend=False (bilingual checkpoint
+# stores one front end; the gates deliberately serve the other).
+#
+#     powershell -File scripts/run_v2_gates.ps1 -Checkpoint runs/v2/inference.pt -Tag gate-80000
+#
+# Thresholds: KO generated_cer <= 0.125, EN generated_wer <= 0.015.
 param(
     [string]$Checkpoint = "runs\v2\inference.pt",
     [string]$Tag = "v2",

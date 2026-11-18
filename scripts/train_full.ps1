@@ -17,7 +17,9 @@ param(
     [string]$Config = "config-ko.json",
     [string]$Log = "logs_train_full.txt",
     [int]$MaxAttempts = 40,
-    [string]$Frontend = "ko"   # v2.0 trains with ko-loan
+    [string]$Frontend = "ko",   # v2.0 trains with ko-loan
+    [string]$InitFrom = "",     # D1 branch: start from another run's checkpoint
+    [switch]$NewData            # D1 branch: --init-from data comes from different annotations
 )
 
 $ErrorActionPreference = "Continue"
@@ -62,7 +64,14 @@ for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
         "--save-every", "2000", "--keep-every", "10000", "--log-every", "50",
         "--max-seconds", "$ChunkSeconds"
     )
-    if (Test-Path $last) { $arguments += @("--resume", $last) }
+    if (Test-Path $last) {
+        $arguments += @("--resume", $last)
+    } elseif ($InitFrom) {
+        # --init-from and --resume are mutually exclusive in train.py, so the
+        # branch flags go on the first chunk only; later chunks resume as usual.
+        $arguments += @("--init-from", $InitFrom)
+        if ($NewData) { $arguments += @("--new-data") }
+    }
 
     & $python @arguments *>> $Log
     if ($LASTEXITCODE -ne 0) { "!!! chunk exited with $LASTEXITCODE" | Out-File -FilePath $Log -Append -Encoding utf8 }
