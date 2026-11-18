@@ -34,11 +34,15 @@ Write-Host "== 3/6  Strict export (--external-noise) for the exact parity check"
 
 Write-Host "== 4/6  Bump VERSION in worker.js (Cache Storage key)" -ForegroundColor Cyan
 $workerPath = "tiny-voca\web\public\worker.js"
-$text = Get-Content -Raw (Join-Path $root $workerPath)
+# PS 5.1's Get-Content -Raw reads a BOM-less UTF-8 file as ANSI (CP949 here) and
+# mangles every Korean string; ReadAllText with an explicit UTF-8 encoding is
+# the only safe way (this exact bug shipped a corrupted worker.js on 2026-11-18).
+$workerFile = Join-Path $root $workerPath
+$text = [System.IO.File]::ReadAllText($workerFile, [System.Text.Encoding]::UTF8)
 if ($text -match 'const VERSION = "(\d+)";') {
     $next = [int]$Matches[1] + 1
     $text = $text -replace 'const VERSION = "\d+";', ('const VERSION = "' + $next + '";')
-    [System.IO.File]::WriteAllText((Join-Path $root $workerPath), $text, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($workerFile, $text, (New-Object System.Text.UTF8Encoding($false)))
     Write-Host "    VERSION bumped to $next"
 } else {
     throw "const VERSION not found in $workerPath"
