@@ -50,9 +50,13 @@ LOAN_LOOKUP = dict(LOANWORD_CASES)
 
 
 def units_of(text: str):
-    """Mode A phonemisation -> joined Hangul syllables (the listenable units)."""
+    """Mode A phonemisation -> joined Hangul syllables (the listenable units).
+
+    ``Phonemized.units`` is a tuple of ``(label, start, end)`` triples where the
+    label is the alignable syllable/token (the ids indices are irrelevant here).
+    """
     out = phonemize_mixed(text, "ko-loan")
-    return "".join(out.units) if out.units else None
+    return "".join(label for label, _s, _e in out.units if label) if out.units else None
 
 
 def main():
