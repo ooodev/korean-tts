@@ -19,7 +19,7 @@ upstream `n4ze3m/tiny-voca` dataset (F2/M2).
 | Corpus | KSS 12 210/322/322 clips (8.45 h) + n4ze3m EN 7 976/702/576 clips; merged manifest **16 451 / 933 / 802** |
 | Aligners | `wav2vec2-large-xlsr-korean` CTC (KSS, reusing v1's `annotations_full`) + `wav2vec2-lv-60-espeak-cv-ft` CTC (F2/M2, `own` front end) |
 | Model | **4 550 347** parameters, 3 speakers (`KSS`, `F2`, `M2`), **160 000 steps** from scratch (GAN from 8 000) on an RTX 4090 <!-- PUBLISH: elapsed time --> |
-| Gates | KO CER ≤ 12.5 % (v1: 11.8 %) at the KSS rows, EN WER ≤ 1.5 % with `small.en` at the F2/M2 rows; decision gates at 80k/120k <!-- PUBLISH: final gate numbers --> |
+| Gates | KO CER ≤ 12.5 % (v1: 11.8 %) at the KSS rows, EN WER ≤ 1.5 % with `small.en` at the F2/M2 rows; decision gates at 80k/120k both passed (KO 6.01 % → 5.67 %, EN 0.90 % → 0.79 %) <!-- PUBLISH: final gate numbers --> |
 | Batteries | 20-case number battery + 20-word loanword battery (P1 golden tables) + 16-case Mode A+B listening set <!-- PUBLISH: results --> |
 | Browser demo | voice `<select>` (3 voices), voice=mode routing, 8 example chips; ONNX + Pyodide in the page <!-- PUBLISH: published-site measurement --> |
 
@@ -104,9 +104,22 @@ Decision gates at 80k/120k and the final gate on `runs/v2/inference.pt` run
   data loading, before synthesis), ASR **small.en** per spec §5, metric
   `summary.test.all.generated_wer`; pass ≤ 1.5 %.
 
-<!-- PUBLISH: final gate table (KO CER, EN WER, duration ratio, pitch spread,
-mel DTW, per-voice entries, frontend_token_mismatches) + the 80k/120k decision
-history and the Q3 (160k vs 190k) outcome -->
+**Decision-gate history** (`eval/v2/gate-80000/`, `eval/v2/gate-120000/`):
+
+| Step | KO CER | pass (≤ 12.5 %) | EN WER | pass (≤ 1.5 %) | frontend_token_mismatches |
+| --- | --- | --- | --- | --- | --- |
+| 80 000 | 6.01 % | ✅ | 0.90 % | ✅ | 0 |
+| 120 000 | 5.67 % | ✅ | 0.79 % | ✅ | 0 |
+
+**Q3 (160k vs 190k) outcome: 160 000.** At 120k both metrics are already far
+under the bars (KO 5.67 % vs v1's 11.8 %; EN 0.79 % vs the 1.5 % target), still
+improving 80k→120k (KO −0.34 pt, EN −0.11 pt) — nothing justifies the reserved
+30k extension, so the original budget stands. The 120k pass also closes the D1
+question: no warm start was needed, training continued from step 0.
+
+<!-- PUBLISH: final gate table on runs/v2/inference.pt (KO CER, EN WER,
+duration ratio, pitch spread, mel DTW, per-voice entries,
+frontend_token_mismatches) -->
 
 ## 7. Samples & batteries
 

@@ -1393,3 +1393,33 @@ If alignment is ever re-run, the two CTC aligners re-download (~4.8 GB).
   `-Frontend` (default `ko` preserves v1); recipe unchanged from v1 (batch 12000/48,
   warmup 1000, half-life 100 000, GAN 8000/3000/0.7, teacher 3000/7000/0).
 
+## 2026-11-18 ≈14:20 — Gate re-run verdicts: both PASS. D1 closed, Q3 = 160k
+
+### Verdicts (`eval/v2/gate-{80,120}000/verdict.json`, pinned checkpoints)
+
+| Step | KO CER | pass (≤ 12.5 %) | EN WER | pass (≤ 1.5 %) | KO samples | EN samples | mismatches |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 80 000 | 0.0601 | ✅ | 0.009 | ✅ | 228 | 574 | 0 |
+| 120 000 | 0.0567 | ✅ | 0.0079 | ✅ | 228 | 574 | 0 |
+
+Trend 80k→120k: KO −0.34 pt, EN −0.11 pt — both still improving, both far under
+the bars (KO at 5.67 % vs v1's final 11.8 %).
+
+### Decisions
+
+- **D1 (120k decision gate): PASS — no warm start.** The staged
+  `eval/v2/warm-snapshot.pt` remains untouched; training continues from step 0
+  in `runs/v2`.
+- **Q3 (step budget): 160 000.** Both metrics pass with wide margin at 120k and
+  are still improving; the reserved 190k extension was for borderline outcomes,
+  so the original budget stands.
+
+### State
+
+- Main chain alive at step ≈ 127 000, 3.60 steps/s → 160k ETA ≈ 16:58 local.
+- Final gate after the chain: `scripts/run_v2_gates.ps1 -Checkpoint
+  runs\v2\inference.pt -Tag final -Device cuda`, then
+  `battery_v2.py` + `listening_v2.py`, then P5 publish.
+- Report updated: `FINAL_REPORT_v2.md` now carries the decision-gate table and
+  Q3 outcome (final-gate table still a PUBLISH marker).
+
