@@ -1,0 +1,13 @@
+{
+ "tag": "final",
+ "step": 160000,
+ "ko_cer": 0.0535,
+ "ko_cer_max": 0.125,
+ "ko_pass": true,
+ "en_wer": 0.008,
+ "en_wer_max": 0.015,
+ "en_pass": true,
+ "ko_samples": 228,
+ "en_samples": 574,
+ "all_pass": true
+}

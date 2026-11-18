@@ -1423,3 +1423,71 @@ the bars (KO at 5.67 % vs v1's final 11.8 %).
 - Report updated: `FINAL_REPORT_v2.md` now carries the decision-gate table and
   Q3 outcome (final-gate table still a PUBLISH marker).
 
+## 2026-11-18 ≈17:25 — Training 160k DONE, final gate PASS, P5 publish green
+
+### Training (Phase 3 complete)
+
+- `runs/v2`: **step 160 000, finished 16:59**, `=== training finished at step
+  160000 ===`, **0 NaN**, 4 resumable 4-h chunks (0 → 54 705 → 106 008 →
+  155 656 → 160 000), **0 chunk failures**, 0 chunk retries.
+- Wall clock **12 h 22 m** (44 415 s chunk time + restarts); post-GAN
+  throughput ≈ 3.5 steps/s (v1: 3.2); final validation: duration ratio 1.003,
+  pause accuracy 0.997, pitch spread ratio 0.99, pitch error 3.66 st.
+
+### Final gate (`eval/v2/final/verdict.json`) — PASS
+
+| Gate | Samples | Metric | Bar | Result |
+| --- | --- | --- | --- | --- |
+| KO (KSS, Mode A) | 228 | generated CER | ≤ 12.5 % | **5.35 %** ✅ |
+| EN (F2/M2, Mode B) | 574 | generated WER | ≤ 1.5 % | **0.80 %** ✅ |
+
+Per-voice: F2 WER 0.67 % (284), M2 WER 0.92 % (290).
+`frontend_token_mismatches: 0` both gates. Full metric set in
+`FINAL_REPORT_v2.md` §6. Honest notes: pause ratio ~1.1–1.2; F2 pitch spread
+0.89× reference (M2 1.01×) — outside pass bars, flagged for the listening pass.
+Trend: 80k 6.01 % → 120k 5.67 % → **final 5.35 %** (still improving at the end);
+EN 0.90 % → 0.79 % → 0.80 % (flat at the bottom).
+
+### Batteries + listening set
+
+- Battery (`samples_v2_battery/battery_summary.json`): text level **39/39**
+  (19 number + 20 loanword, P1 golden contract intact); Whisper-small-ko ASR
+  proxy mean CER **58.9 %** — noisy proxy, not the spec gate: digit-preference
+  bias (`세명` spoken → `3명` transcribed, `10km` → `10km`) + short-word
+  instability (`AI` → `예, 예, 예`, `bag` → `big`). 9/20 loanwords exact.
+- Two `battery_v2.py` bugs fixed this window: `units_of` now reads
+  `(label, start, end)` triples of `Phonemized.units` (old code joined tuples
+  → TypeError); case names now deterministic (blake2b) + filesystem-safe (the
+  input `3/14` produced `...\3\14.wav` → LibsndfileError). Verified:
+  `hello` → `헬로`.
+- Listening set (`samples_v2/`): 16/16 wavs (8 Mode A KSS + 8 Mode B F2/M2),
+  `verify_wavs` all OK, 24 kHz mono, peaks 0.44–0.98.
+
+### P5 publish (`logs_v2_publish.txt`) — both demo gates green
+
+- MeCab dict: 20 649 eojeols from the KSS train split, 0.95 MB, 100.00 %
+  eojeol coverage.
+- `model.onnx` 21.44 MB (re-export under ko-loan), first-visit assets 28.8 MB;
+  **VERSION 1 → 2**.
+- `check_onnx.py`: durations exact, min corr **0.9826** (noise realisation
+  differs, peak 0.199), strict `--external-noise` graph peak **0.000906**
+  (~−61 dB, float32 conv accumulation) → OK.
+- `check_shim.py`: 462 held-out sentences / 17 281 tokens, **92.64 %**
+  identical (gate ≥ 90 %), token accuracy **99.80 %** (34 tokens differ).
+
+### Incidents / observations
+
+- The harness delivered **premature "completed" notifications twice** (final
+  gate, publish) while the child python was still running (seen as an
+  "orphan" GPU process mid-EN-ASR). Lesson: trust the sentinel artifacts
+  (verdict.json / final log lines), re-verify on the second notification.
+- Publish pipeline reported exit code 1 despite all gates green: PS 5.1
+  artifact — native stderr (export DeprecationWarning) piped through the outer
+  `2>&1 | Tee-Object`; not a script defect (gates print their own OK lines).
+- README typo fixed: `双语` → `이중언어` (stray CJK in a PowerShell comment).
+
+### Next
+
+Push → Pages build → published-site measurement (fill the last PUBLISH
+markers in README/GUIDE/FINAL_REPORT) → final commit.
+

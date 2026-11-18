@@ -36,15 +36,37 @@ runs/full/*
 !runs/full/config.json
 !runs/full/recipe.json
 !runs/full/metrics.jsonl
+# v2 run: slim checkpoint + recipe/metrics (step-*.pt and last.pt stay out)
+!runs/v2/
+runs/v2/*
+!runs/v2/inference.pt
+!runs/v2/config.json
+!runs/v2/recipe.json
+!runs/v2/metrics.jsonl
 
 # dizione's dictionaries (5 MB, needed by the front end); the aligner and
 # Whisper checkpoints are downloaded on first use
 weights/*
 !weights/phonemizer/
 
+# v2 data: KSS shards are v1's; EN shards + junction dir are regenerable
+data_en/
+data_en_smoke/
+features_en/
+features_en_smoke/
+features_mixed/     # junctions into features2/ + features_en/
+logs_en_parts/
+logs_en_parts3/
+samples_smoke_v2/
+annotations_en_smoke/
+annotations_mixed_smoke/
+# annotations_mixed is the second-quick merge of annotations_full + annotations_en
+annotations_mixed/
+
 # Stage logs: the full training log is committed, the per-stage ones are noise
 logs_*.txt
 !logs_train_full.txt
+!logs_train_v2.txt
 
 # Evaluation audio: the full run and the step-80 000 pre-check
 eval/*
@@ -53,3 +75,37 @@ eval/full/*
 !eval/full/audio/
 !eval/full/report.json
 !eval/precheck/
+
+# v2 gate artifacts: verdicts + per-gate reports + pinned checkpoints, no
+# audio (~300 MB per gate); the shared gate manifests stay out
+!eval/v2/
+eval/v2/*
+!eval/v2/gate-80000/
+!eval/v2/gate-120000/
+!eval/v2/final/
+eval/v2/gate-80000/*
+eval/v2/gate-120000/*
+eval/v2/final/*
+!eval/v2/gate-80000/verdict.json
+!eval/v2/gate-80000/inference.pt
+!eval/v2/gate-120000/verdict.json
+!eval/v2/gate-120000/inference.pt
+!eval/v2/final/verdict.json
+!eval/v2/gate-80000/ko/
+!eval/v2/gate-80000/en/
+!eval/v2/gate-120000/ko/
+!eval/v2/gate-120000/en/
+!eval/v2/final/ko/
+!eval/v2/final/en/
+eval/v2/gate-80000/ko/*
+eval/v2/gate-80000/en/*
+eval/v2/gate-120000/ko/*
+eval/v2/gate-120000/en/*
+eval/v2/final/ko/*
+eval/v2/final/en/*
+!eval/v2/gate-80000/ko/report.json
+!eval/v2/gate-80000/en/report.json
+!eval/v2/gate-120000/ko/report.json
+!eval/v2/gate-120000/en/report.json
+!eval/v2/final/ko/report.json
+!eval/v2/final/en/report.json

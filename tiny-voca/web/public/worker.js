@@ -26,7 +26,7 @@ let pyodide, phonemize, session, config;
 const status = (text, progress) => postMessage({ type: "status", text, progress });
 
 // Bump when the files under assets/ change, so browsers fetch them again.
-const VERSION = "1";
+const VERSION = "2";
 
 // Downloaded files are kept in the browser's cache storage: a second visit starts without the network.
 async function download(url, label) {
@@ -64,17 +64,17 @@ async function fetchBytes(url, label) {
 }
 
 async function loadPhonemizer() {
-  status("음성 분석 준비");
+  status("?뚯꽦 遺꾩꽍 以鍮?);
   pyodide = await loadPyodide({ indexURL: PYODIDE });
   await pyodide.loadPackage(["numpy", "nltk"]);
   const [front, dizione, dictionary, cmudict, ...data] = await Promise.all([
-    download("assets/pyfront.zip", "음성 분석 준비"),
-    download("assets/dizione.zip", "영어 사전 준비"),
-    download("assets/mecab-dict.json", "형태 분석 사전 준비"),
-    download("assets/phonemizer/cmudict.zip", "영어 사전 준비"),
-    ...DIZIONE_DATA.map((name) => download("assets/phonemizer/" + name, "발음 사전 준비")),
+    download("assets/pyfront.zip", "?뚯꽦 遺꾩꽍 以鍮?),
+    download("assets/dizione.zip", "?곸뼱 ?ъ쟾 以鍮?),
+    download("assets/mecab-dict.json", "?뺥깭 遺꾩꽍 ?ъ쟾 以鍮?),
+    download("assets/phonemizer/cmudict.zip", "?곸뼱 ?ъ쟾 以鍮?),
+    ...DIZIONE_DATA.map((name) => download("assets/phonemizer/" + name, "諛쒖쓬 ?ъ쟾 以鍮?)),
   ]);
-  status("음성 분석 실행");
+  status("?뚯꽦 遺꾩꽍 ?ㅽ뻾");
   pyodide.FS.mkdirTree("/dizione-data");
   DIZIONE_DATA.forEach((name, index) => pyodide.FS.writeFile("/dizione-data/" + name, data[index]));
   pyodide.FS.mkdirTree("/nltk_data/corpora");
@@ -99,29 +99,29 @@ def phonemize_json(text, mode):
     return json.dumps({"ids": list(result.ids), "stress": list(result.stress),
                        "symbols": list(result.symbols), "unknown": list(result.unknown)})
 
-phonemize_json("테스트 문장입니다.", "ko-loan")
+phonemize_json("?뚯뒪??臾몄옣?낅땲??", "ko-loan")
 `);
   phonemize = pyodide.globals.get("phonemize_json");
 }
 
 async function loadModel() {
   config = await (await fetch("assets/config.json")).json();
-  const bytes = await download("assets/model.onnx", "모델 다운로드");
-  status("모델 실행");
+  const bytes = await download("assets/model.onnx", "紐⑤뜽 ?ㅼ슫濡쒕뱶");
+  status("紐⑤뜽 ?ㅽ뻾");
   ort.env.wasm.wasmPaths = ORT;
   ort.env.wasm.numThreads = 1;
   session = await ort.InferenceSession.create(bytes, { executionProviders: ["wasm"] });
 }
 
-// Sentences: Korean ends a sentence at . ! ? … (and the vertical bar the corpus
+// Sentences: Korean ends a sentence at . ! ? ??(and the vertical bar the corpus
 // uses), so split on those, keeping the mark with the sentence it closes.
 function sentences(text) {
   const parts = [];
   let current = "";
-  for (const piece of text.replace(/\s+/g, " ").trim().split(/(?<=[.!?…])\s+/)) {
+  for (const piece of text.replace(/\s+/g, " ").trim().split(/(?<=[.!???)\s+/)) {
     if (!piece) continue;
     current = current ? current + " " + piece : piece;
-    if (/[.!?…]$/.test(current) || current.length > 60) { parts.push(current); current = ""; }
+    if (/[.!???$/.test(current) || current.length > 60) { parts.push(current); current = ""; }
   }
   if (current) parts.push(current);
   return parts.filter((part) => /[\p{L}\p{N}]/u.test(part));
@@ -132,7 +132,7 @@ function sentences(text) {
 function fit(sentence, mode) {
   const result = JSON.parse(phonemize(sentence, mode));
   if (result.ids.length <= config.max_tokens - 12) return [result];
-  const pieces = sentence.split(/(?<=[,;:—])\s+/);
+  const pieces = sentence.split(/(?<=[,;:??)\s+/);
   if (pieces.length > 1) return pieces.flatMap((piece) => fit(piece, mode));
   const words = sentence.split(" ");
   if (words.length < 2) return [];
@@ -152,7 +152,7 @@ async function synthesize(phones, voiceIndex, speed, pitchShift, pitchRange) {
   return { audio: output.audio.data, durations: output.durations.data };
 }
 
-// V2_SPEC §0: the Korean corpus voice speaks Mode A (ko-loan), the English
+// V2_SPEC 짠0: the Korean corpus voice speaks Mode A (ko-loan), the English
 // corpus voices speak Mode B (own).
 const defaultMode = (voice) => voice === "KSS" ? "ko-loan" : "own";
 

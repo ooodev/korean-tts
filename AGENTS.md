@@ -131,7 +131,7 @@ $env:MECAB_DICT="C:\ai-workspace\korean-tts\tiny-voca\web\public\assets\mecab-di
 .\.venv\Scripts\python.exe scripts\check_shim.py --sentences 644   # shim == MeCab, held-out splits
 ```
 
-## Phase status
+## Phase status — v1.0 (Korean only, `runs/full`)
 
 | Phase | State | Gate |
 | --- | --- | --- |
@@ -144,3 +144,14 @@ $env:MECAB_DICT="C:\ai-workspace\korean-tts\tiny-voca\web\public\assets\mecab-di
 | 7 Full prepare/annotate/train | ✅ | 8 504 clips aligned, 130 000 steps, no NaN |
 | 8 Samples & quality | ✅ | 7 wavs, mean CER 15.7 % (8.4 % numerals folded) |
 | 9 Browser demo | ✅ | ONNX parity (durations exact, corr ≥ 0.982), shim 92.6 % identical / 99.80 % tokens, live at ooodev.github.io/korean-tts |
+
+## Phase status — v2.0 (bilingual, `runs/v2`)
+
+| Phase | State | Gate |
+| --- | --- | --- |
+| P1 ko-loan front end | ✅ | 185/185 golden cases (`test_frontend_gate.py`), suite 257 OK |
+| P2 EN data + features | ✅ | 7 976/702/576 clips, 0 rejected, features_en built |
+| P3 EN align + merge | ✅ | annotations_en (espeak-CTC) + annotations_mixed 16 451/933/802, fingerprint 3b930c46d7498d22 |
+| P4 Train 160k | ✅ | 12 h 22 m, 4 chunks, 0 failures, 0 NaN; 80k/120k gates PASS (KO 6.01→5.67 %, EN 0.90→0.79 %), D1 no warm start, Q3 = 160k |
+| P5 Final gates + batteries | ✅ | final: KO CER **5.35 %** ≤ 12.5 %, EN WER **0.80 %** ≤ 1.5 %, 0 token mismatches; battery text 39/39; listening 16/16 wavs OK |
+| P6 Browser demo publish | ✅ | model.onnx 21.44 MB (VERSION 2), check_onnx corr ≥ 0.9826 + strict −61 dB, check_shim 92.64 % identical / 99.80 % tokens; live at ooodev.github.io/korean-tts |

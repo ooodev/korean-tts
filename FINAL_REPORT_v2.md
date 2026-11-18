@@ -118,19 +118,54 @@ improving 80k→120k (KO −0.34 pt, EN −0.11 pt) — nothing justifies the re
 30k extension, so the original budget stands. The 120k pass also closes the D1
 question: no warm start was needed, training continued from step 0.
 
-<!-- PUBLISH: final gate table on runs/v2/inference.pt (KO CER, EN WER,
-duration ratio, pitch spread, mel DTW, per-voice entries,
-frontend_token_mismatches) -->
+**Final gate** on `runs/v2/inference.pt` (step 160 000, `eval/v2/final/`):
+
+| Gate | Samples | Primary metric | Pass bar | Result |
+| --- | --- | --- | --- | --- |
+| KO (KSS rows, Mode A) | 228 | generated CER | ≤ 12.5 % | **5.35 %** ✅ (v1: 11.8 %) |
+| EN (F2/M2 rows, Mode B) | 574 | generated WER | ≤ 1.5 % | **0.80 %** ✅ |
+
+Per-voice and full metric set:
+
+| Gate | WER | CER | dur ratio | pause ratio | mel DTW | pitch std (gen / ref, st) |
+| --- | --- | --- | --- | --- | --- | --- |
+| KO · KSS | 18.43 % | **5.35 %** | 0.975 | 1.160 | 0.773 | 4.96 / 5.02 |
+| EN · F2 (284) | **0.67 %** | 0.21 % | 0.974 | 1.095 | 0.801 | 3.40 / 3.82 |
+| EN · M2 (290) | **0.92 %** | 0.27 % | 0.976 | 1.126 | 0.668 | 4.33 / 4.27 |
+
+`frontend_token_mismatches: 0` on both gates. Two honest observations:
+pause ratio ~1.1–1.2 (the model slightly lengthens pauses vs the references)
+and F2's pitch spread runs 0.89× the reference (flatter intonation on the
+female voice; M2 matches at 1.01×). Both are outside the pass bars, noted for
+the listening pass.
 
 ## 7. Samples & batteries
 
-- `scripts/battery_v2.py`: the spec §5 listening batteries — 20 number cases +
+- `scripts/battery_v2.py`: the spec §5 listening batteries — 19 number cases +
   20 loanword cases imported from the P1 golden tables, text-level pre-check
   against the locked contract, Mode A KSS synthesis, Whisper-ko CER proxy.
 - `scripts/listening_v2.py`: 16-case Mode A+B listening set on the final
   checkpoint (greetings, numbers, code-mix, flow, questions, stress).
 
-<!-- PUBLISH: battery results + listening-set file list -->
+**Battery results** (`samples_v2_battery/`, `battery_summary.json`):
+
+- Text level: **39/39** locked readings reproduce exactly (P1 contract holds
+  on the final checkpoint).
+- ASR proxy (Whisper small, `language=ko`): mean CER **58.9 %** — a noisy
+  proxy, not the spec gate (that is the human listening pass). Two dominant
+  ASR-side biases inflate it: digit-preference (`세명` spoken, `3명` transcribed;
+  `3시 30분` → `3시 30분`, `10km` → `10km`) and short-word instability
+  (`AI` → `예, 예, 예`, `bus` → `다시`, `bag` → `big`). 9/20 loanwords were
+  transcribed exactly (hello, computer, dollar, coffee, algorithm, chocolate,
+  digital, nameplate, xylophone); number cases where ASR cooperated confirm
+  the Korean readings (`3번째` → `세번째`, `20살` → `스무살`).
+- `scripts/battery_v2.py` fixes this window: `units_of` now reads the
+  `(label, start, end)` triples of `Phonemized.units`, and case names are
+  deterministic + filesystem-safe (the old name scheme crashed on `3/14`).
+
+**Listening set** (`samples_v2/`, 16 files, `verify_wavs` 16/16 OK): 8 Mode A
+KSS (`a1_greeting`…`a8_numbers_units`) + 8 Mode B F2/M2
+(`b1_female_greeting`…`b8_male_numbers`); all at 24 kHz mono, peaks 0.44–0.98.
 
 ## 8. Browser demo (P5)
 
@@ -141,11 +176,20 @@ frontend_token_mismatches) -->
   the standard path on quote+comma punctuation (4 of 10 EN corpus sentences).
 - `index.html`: voice `<select>` from `config.voices`, 8 example chips
   (6 KSS Mode A + F2/M2 Mode B), bilingual copy, v2 facts.
-- Assets: `model.onnx` re-exported under `TINY_VOCA_FRONTEND=ko-loan` from
-  `runs/v2/inference.pt`, `VERSION` bumped for Cache Storage.
+- Assets: `model.onnx` (21.4 MB) re-exported under `TINY_VOCA_FRONTEND=ko-loan`
+  from `runs/v2/inference.pt`; first-visit download 28.8 MB (excluding Pyodide);
+  `VERSION` 1 → 2 for Cache Storage.
 
-<!-- PUBLISH: ONNX size, parity numbers (check_onnx.py), shim accuracy
-(check_shim.py), published-site measurement, live URL -->
+**Demo gates** (this publish run, `logs_v2_publish.txt`):
+
+- `check_onnx.py`: durations exact, min ONNX↔torch correlation **0.9826**
+  (internal noise realisation differs, peak 0.199), strict `--external-noise`
+  graph peak **0.000906** (~−61 dB, float32 conv accumulation) → OK.
+- `check_shim.py`: held-out val+test, 462 sentences / 17 281 tokens,
+  **92.64 %** identical token streams (gate ≥ 90 %), token accuracy
+  **99.80 %** (34 tokens differ; the `python-mecab-ko`-only assimilation rules).
+
+<!-- PUBLISH: published-site measurement + live URL -->
 
 ## 9. Reproducing
 

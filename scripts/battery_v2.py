@@ -111,7 +111,14 @@ def main():
     set_frontend("ko-loan")
     records = []
     for r in text_results:
-        name = f"{r['battery']}_{abs(hash((r['battery'], r['input'])) % 10000):04d}_{r['input'][:12]}"
+        # Deterministic, filesystem-safe case name: a blake2b digest plus the
+        # input with any path-hostile characters replaced (e.g. "3/14" -> "3_14").
+        import hashlib
+        digest = hashlib.blake2b(f"{r['battery']}|{r['input']}".encode("utf-8"),
+                                 digest_size=2).hexdigest()
+        safe_input = "".join(ch if (ch.isalnum() or ch in "-_.") else "_"
+                             for ch in r["input"][:12])
+        name = f"{r['battery']}_{digest}_{safe_input}"
         wave, phones, _ = speak(model, r["input"], "KSS", seed=args.seed)
         target = args.outdir / f"{name}.wav"
         sf.write(target, wave.numpy(), model.config.sample_rate, subtype="FLOAT")

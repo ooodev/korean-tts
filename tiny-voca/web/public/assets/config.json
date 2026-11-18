@@ -2,7 +2,9 @@
  "sample_rate": 24000,
  "hop": 256,
  "voices": [
-  "KSS"
+  "KSS",
+  "F2",
+  "M2"
  ],
  "symbols": [
   "<pad>",
@@ -150,9 +152,9 @@
  ],
  "max_tokens": 512,
  "max_frames": 3000,
- "step": 130000,
- "frontend": "dizione+g2pk",
- "frontend_fingerprint": "06a48bff1433c108d5745940ada718bd7f3f55b83fb3563ce1e533ff414dbb80",
+ "step": 160000,
+ "frontend": "dizione+g2pk+loanwords",
+ "frontend_fingerprint": "3f002758c5a0b3dc5c1789d8b178112d617f3e4dc0598afb97ad385d13156c2a",
  "inputs": [
   "tokens",
   "stress",

@@ -1,0 +1,13 @@
+{
+ "tag": "gate-120000",
+ "step": 120000,
+ "ko_cer": 0.0567,
+ "ko_cer_max": 0.125,
+ "ko_pass": true,
+ "en_wer": 0.0079,
+ "en_wer_max": 0.015,
+ "en_pass": true,
+ "ko_samples": 228,
+ "en_samples": 574,
+ "all_pass": true
+}

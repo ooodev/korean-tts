@@ -19,13 +19,13 @@ cd C:\ai-workspace\korean-tts
 # http://127.0.0.1:8081/
 ```
 
-첫 방문 시 약 40 MB(모델 <!-- PUBLISH: v2 ONNX size --> MB + 발음 사전 + Pyodide 런타임)를 받고,
+첫 방문 시 약 40 MB(모델 21.4 MB + 발음 사전 + Pyodide 런타임)를 받고,
 두 번째 방문부터는 Cache Storage에서 바로 시작합니다.
 
 ## 자산 다시 만들기
 
 ```powershell
-$env:PYTHONUTF8="1"; $env:TINY_VOCA_FRONTEND="ko-loan"   # v2:双语 체크포인트는 ko-loan 어휘로 내보낸다
+$env:PYTHONUTF8="1"; $env:TINY_VOCA_FRONTEND="ko-loan"   # v2: 이중언어 체크포인트는 ko-loan 어휘로 내보낸다
 $env:DIZIONE_DATA="C:\ai-workspace\korean-tts\weights\phonemizer"
 
 .\.venv\Scripts\python.exe scripts\build_mecab_dict.py      # 형태 분석 사전 (MeCab 분석 기록)
@@ -34,7 +34,7 @@ $env:DIZIONE_DATA="C:\ai-workspace\korean-tts\weights\phonemizer"
 
 | 자산 | 크기 | 출처 |
 | --- | --- | --- |
-| `model.onnx`, `config.json` | <!-- PUBLISH: v2 ONNX size --> MB | `runs/v2/inference.pt` → `python -m tiny_voca.export` |
+| `model.onnx`, `config.json` | 21.4 MB | `runs/v2/inference.pt` → `python -m tiny_voca.export` |
 | `phonemizer/` | 6.3 MB | `weights/phonemizer` (dizione) + NLTK `cmudict.zip` |
 | `mecab-dict.json` | 0.95 MB | 학습 스플릿 12 210문장의 MeCab 분석 (20 649 어절) |
 | `pyfront.zip` | 0.04 MB | g2pk + jamo + `kofront`(vocab/text/korean) + `mecab.py` shim |
