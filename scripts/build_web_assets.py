@@ -30,7 +30,10 @@ ROOT = Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "tiny-voca" / "web" / "public" / "assets"
 DIZIONE_DATA = ROOT / "weights" / "phonemizer"
 SITE_PACKAGES = ROOT / ".venv" / "Lib" / "site-packages"
-FRONTEND_FILES = ("vocab.py", "text.py", "korean.py")
+# loanwords.py must ship too: korean.py lazily imports loanword_span from it
+# for English spans inside Korean text; a missing module only bites on
+# code-mixed input, so the pure-Korean gates never caught it (2026-11-18).
+FRONTEND_FILES = ("vocab.py", "text.py", "korean.py", "loanwords.py")
 DIZIONE_BUILT = ("lexicon.tsv", "align.json", "g2p.json", "g2p.npz", "homographs.json")
 
 
