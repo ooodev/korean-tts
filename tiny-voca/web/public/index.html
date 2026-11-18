@@ -27,10 +27,15 @@
   .panel { margin-top: 36px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
   textarea { width: 100%; min-height: 130px; resize: vertical; border: 0; outline: 0; background: transparent; color: inherit;
              font: 20px/1.55 var(--ui); padding: 4px; }
-  .examples { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 2px; }
-  .examples button { font: 13px var(--ui); color: var(--muted); background: transparent; border: 1px solid var(--line);
-                     border-radius: 999px; padding: 5px 11px; cursor: pointer; }
-  .examples button:hover { color: var(--ink); border-color: var(--muted); }
+  .examples { margin: 12px 0 2px; }
+  .ex-group { margin-top: 12px; }
+  .ex-group h3 { margin: 0 0 7px; font: 600 12px var(--ui); letter-spacing: 0.05em; color: var(--muted); }
+  .ex-group .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ex-group .chips button { font: 13px var(--ui); color: var(--muted); background: transparent; border: 1px solid var(--line);
+                            border-radius: 999px; padding: 5px 11px; cursor: pointer; }
+  .ex-group .chips button:hover { color: var(--ink); border-color: var(--muted); }
+  .ex-group .chips button.active { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+  .hint { margin: 12px 0 0; font-size: 13px; color: var(--muted); }
   .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; border-top: 1px solid var(--line); margin-top: 14px; padding-top: 14px; }
   .voice { font-size: 14px; color: var(--muted); display: inline-flex; align-items: center; gap: 8px; }
   .voice select { font: 14px var(--ui); color: var(--ink); background: transparent;
@@ -41,13 +46,14 @@
   #speak { margin-left: auto; font: 600 16px var(--ui); color: var(--accent-ink); background: var(--accent); border: 0;
            border-radius: 10px; padding: 11px 22px; cursor: pointer; }
   #speak:disabled { opacity: 0.45; cursor: default; }
-  #speak:focus-visible, textarea:focus-visible, .examples button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #speak:focus-visible, textarea:focus-visible, .ex-group .chips button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .status { margin-top: 16px; font-size: 14px; color: var(--muted); min-height: 22px; }
   .bar { height: 3px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
   .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.15s; }
   .bar[hidden] { display: none; }
   .result[hidden] { display: none; }
   .result { margin-top: 22px; }
+  .result-text { margin: 0 0 10px; font: 15px/1.6 var(--ui); color: var(--ink); }
   audio { width: 100%; }
   dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0 0; }
   dl div { border-top: 1px solid var(--line); padding-top: 8px; }
@@ -82,6 +88,7 @@
   <section class="panel">
     <textarea id="text" spellcheck="false" aria-label="합성할 문장">안녕하세요. 오늘 날씨가 정말 맑고 좋네요.</textarea>
     <div class="examples" id="examples"></div>
+    <p class="hint">예문을 누르면 바로 재생되고, 음성도 종류에 맞게 자동 선택됩니다.</p>
     <div class="controls">
       <span class="voice">음성 <select id="voice" aria-label="음성 선택"></select></span>
       <label class="speed">빠르기 <input id="speed" type="range" min="0.7" max="1.4" step="0.05" value="1"><output id="speed-value">1.00</output></label>
@@ -94,6 +101,7 @@
   <div class="bar" id="bar"><i></i></div>
 
   <section class="result" id="result" hidden>
+    <p class="result-text" id="result-text"></p>
     <audio id="audio" controls></audio>
     <dl>
       <div><dt>오디오</dt><dd id="m-audio">–</dd></div>
@@ -129,25 +137,68 @@
 </main>
 
 <script>
-const EXAMPLES = [
-  ["인사 (KSS)", "안녕하세요. 오늘 날씨가 정말 맑고 좋네요.", "KSS"],
-  ["질문 (KSS)", "지금 몇 시인지 혹시 알려주실 수 있나요?", "KSS"],
-  ["숫자 (KSS)", "이천이십육 년 십일 월 십오 일 오후 세 시 삼십 분입니다.", "KSS"],
-  ["음운 규칙 (KSS)", "국물 맛이 끝내주고 신라의 역사도 흥미롭습니다.", "KSS"],
-  ["감탄 (KSS)", "와, 정말 대단하네요! 드디어 한국어 합성에 성공했습니다!", "KSS"],
-  ["한영 혼용 (KSS)", "오늘 Python으로 테스트를 진행했습니다.", "KSS"],
-  ["영어 (F2)", "It was a bright cold day in April, and the clocks were striking thirteen.", "F2"],
-  ["영어 (M2)", "Nothing is impossible to the person who tries, so we begin tomorrow.", "M2"],
+const SAMPLES = [
+  { group: "한국어 (KSS)", voice: "KSS", chips: [
+    ["인사", "안녕하세요. 오늘 날씨가 정말 맑고 좋네요."],
+    ["질문", "지금 몇 시인지 혹시 알려주실 수 있나요?"],
+    ["음운 규칙", "국물 맛이 끝내주고 신라의 역사도 흥미롭습니다."],
+    ["감탄", "와, 정말 대단하네요! 드디어 한국어 합성에 성공했습니다!"],
+    ["일상", "이번 주말에는 가족과 함께 부산으로 여행 갈 계획입니다."],
+  ]},
+  { group: "숫자 (KSS)", voice: "KSS", chips: [
+    ["날짜", "이천이십육 년 십일 월 십오 일 오후 세 시 삼십 분입니다."],
+    ["시간", "기차는 9시 15분에 출발합니다."],
+    ["금액", "이번 달 전기요금이 32,500원이라고요?"],
+    ["기온", "오늘 기온은 영하 3도에서 영상 15도 사이입니다."],
+    ["인구", "경기도 인구는 약 1,350만 명입니다."],
+  ]},
+  { group: "한영 혼용 (KSS)", voice: "KSS", chips: [
+    ["파이썬", "오늘 Python으로 테스트를 진행했습니다."],
+    ["앱", "새로운 app을 설치하고 인터넷으로 자료를 찾았습니다."],
+    ["유튜브", "주말에는 유튜브로 새 영상을 보고 커피를 마셨습니다."],
+    ["소프트웨어", "컴퓨터와 노트북의 소프트웨어를 최신 버전으로 업데이트했습니다."],
+    ["와이파이", "와이파이가 안 잡혀서 스마트폰을 공유기로 연결했습니다."],
+  ]},
+  { group: "영어 (F2)", voice: "F2", chips: [
+    ["고전", "It was a bright cold day in April, and the clocks were striking thirteen."],
+    ["판그램", "The quick brown fox jumps over the lazy dog."],
+    ["인사", "Good morning! How was your weekend?"],
+    ["안내", "Please make a left turn at the next intersection."],
+    ["어문 유희", "She sells seashells by the seashore."],
+  ]},
+  { group: "영어 (M2)", voice: "M2", chips: [
+    ["격언", "Nothing is impossible to the person who tries, so we begin tomorrow."],
+    ["날씨", "The weather is beautiful, and the birds are singing outside."],
+    ["연설", "I have a dream that one day this nation will rise up."],
+    ["질문", "Can you help me find the nearest bus stop, please?"],
+    ["격언", "Every great journey begins with a single step."],
+  ]},
 ];
 const $ = (id) => document.getElementById(id);
 const worker = new Worker("worker.js");
 let ready = false, busy = false, request = 0, url = null;
 
-for (const [label, text, voice] of EXAMPLES) {
-  const button = document.createElement("button");
-  button.textContent = label;
-  button.onclick = () => { $("text").value = text; $("voice").value = voice; $("text").focus(); };
-  $("examples").append(button);
+for (const { group, voice, chips } of SAMPLES) {
+  const section = document.createElement("div");
+  section.className = "ex-group";
+  const heading = document.createElement("h3");
+  heading.textContent = group;
+  const row = document.createElement("div");
+  row.className = "chips";
+  for (const [label, text] of chips) {
+    const button = document.createElement("button");
+    button.textContent = label;
+    button.onclick = () => {
+      $("text").value = text;
+      $("voice").value = voice;
+      document.querySelectorAll(".ex-group .chips button")
+        .forEach((b) => b.classList.toggle("active", b === button));
+      if (ready && !busy) $("speak").click(); else $("text").focus();
+    };
+    row.append(button);
+  }
+  section.append(heading, row);
+  $("examples").append(section);
 }
 $("speed").oninput = () => { $("speed-value").textContent = Number($("speed").value).toFixed(2); };
 $("pitch").oninput = () => { $("pitch-value").textContent = Number($("pitch").value).toFixed(2); };
@@ -158,7 +209,11 @@ function setStatus(text, progress) {
   if (progress != null) $("bar").firstElementChild.style.width = Math.round(progress * 100) + "%";
 }
 function update() { $("speak").disabled = !ready || busy || !$("text").value.trim(); }
-$("text").oninput = update;
+$("text").oninput = () => {
+  update();
+  document.querySelectorAll(".ex-group .chips button.active")
+    .forEach((b) => b.classList.remove("active"));
+};
 
 function wav(samples, rate) {
   const buffer = new ArrayBuffer(44 + samples.length * 2);
@@ -212,6 +267,7 @@ worker.onerror = (event) => setStatus("시작할 수 없습니다: " + event.mes
 $("speak").onclick = () => {
   busy = true; update(); phonemes = [];
   request += 1;
+  $("result-text").textContent = $("text").value;
   setStatus("합성 중…", 0);
   worker.postMessage({ type: "speak", id: request, text: $("text").value, voice: $("voice").value,
                        speed: Number($("speed").value), pitchShift: Number($("pitch").value), pitchRange: 1 });

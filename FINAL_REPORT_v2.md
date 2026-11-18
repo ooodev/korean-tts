@@ -21,7 +21,7 @@ upstream `n4ze3m/tiny-voca` dataset (F2/M2).
 | Model | **4 550 347** parameters, 3 speakers (`KSS`, `F2`, `M2`), **160 000 steps** from scratch (GAN from 8 000) on an RTX 4090 in **12 h 22 m** (4 resumable ≤4 h chunks, 0 failures) |
 | Gates | KO CER ≤ 12.5 % (v1: 11.8 %) at the KSS rows, EN WER ≤ 1.5 % with `small.en` at the F2/M2 rows; decision gates at 80k/120k both passed (KO 6.01 % → 5.67 %, EN 0.90 % → 0.79 %); **final PASS: KO CER 5.35 %, EN WER 0.80 %** (0 frontend token mismatches) |
 | Batteries | 39-case battery (19 numbers + 20 loanwords, P1 golden tables) + 16-case Mode A+B listening set; text level **39/39 OK**, ASR proxy 58.9 % CER (digit-bias proxy, not the spec gate), listening 16/16 wavs OK |
-| Browser demo | voice `<select>` (3 voices), voice=mode routing, 8 example chips; ONNX + Pyodide in the page — published site measured 2026-11-18: 0 page errors, first-visit load 6.5 s, numbers 4.4 s in 0.28 s (15.7× real time), code-mixed 3.5 s in 0.21 s (16.2×), English (F2) 4.1 s in 0.35 s (11.9×), phonemization 33–149 ms; loanword dictionary confirmed live (Python → 파이썬) |
+| Browser demo | voice `<select>` (3 voices), voice=mode routing, 25 example chips in 5 groups (한국어/숫자/한영 혼용/영어 F2/영어 M2, tap-to-play); ONNX + Pyodide in the page — published site measured 2026-11-18: 0 page errors, first-visit load 6.5 s, numbers 4.4 s in 0.28 s (15.7× real time), code-mixed 3.5 s in 0.21 s (16.2×), English (F2) 4.1 s in 0.35 s (11.9×), phonemization 33–149 ms; loanword dictionary confirmed live (Python → 파이썬) |
 
 ## 1. Serving modes (one checkpoint, two front ends)
 
@@ -174,7 +174,8 @@ KSS (`a1_greeting`…`a8_numbers_units`) + 8 Mode B F2/M2
   (`set_frontend` + `phonemize`) exactly as in the annotations —
   `phonemize_mixed(text, "own")` was deliberately not used: it differs from
   the standard path on quote+comma punctuation (4 of 10 EN corpus sentences).
-- `index.html`: voice `<select>` from `config.voices`, 8 example chips
+- `index.html`: voice `<select>` from `config.voices`, 25 example chips in
+  5 groups (한국어/숫자/한영 혼용/영어 F2/영어 M2, five each) with tap-to-play
   (6 KSS Mode A + F2/M2 Mode B), bilingual copy, v2 facts.
 - Assets: `model.onnx` (21.4 MB) re-exported under `TINY_VOCA_FRONTEND=ko-loan`
   from `runs/v2/inference.pt`; first-visit download 28.8 MB (excluding Pyodide);

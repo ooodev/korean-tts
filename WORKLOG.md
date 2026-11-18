@@ -1585,3 +1585,19 @@ ignore patterns have no inline `#` — the whole line, comment included, became
 the pattern and matched nothing. Fix: comment moved to its own line; the
 v2 feature dirs are now in AGENTS.md's not-committed list too.
 
+## 2026-11-18 ≈21:00 — Demo page: 25 samples in 5 groups, tap-to-play
+
+Replaced the 8 flat example chips in `tiny-voca/web/public/index.html` with
+five groups of five (한국어, 숫자, 한영 혼용 — all KSS — plus 영어 F2 and 영어
+M2), each chip setting text + voice and synthesizing immediately (the click
+is a user gesture, so autoplay is allowed). Active chip highlight, the spoken
+sentence shown above the audio, and a hint line added. Sample selection:
+loanwords verified against `data/loanwords.tsv` before shipping (python,
+app, internet, youtube, coffee, computer, laptop, software, version, wifi —
+`ai`/`cafe`/`gym` are NOT in the dictionary and were avoided); all 25
+sentences phonemized locally with 0 unknown (TN confirmed: 9시 15분 →
+아홉시열다섯분, 32,500원 → 삼만이천오백원, 1,350만 → 천삼백오십만). VERSION
+bumped 4 → 5. Headless-Chrome check on the local server: 5×5 groups render,
+one chip per group taps to `완료.` with correct voice, caption and audio src
+set, 0 page errors. README + FINAL_REPORT_v2 chip counts updated.
+

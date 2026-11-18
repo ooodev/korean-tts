@@ -5,7 +5,7 @@
 
 | 파일 | 내용 |
 | --- | --- |
-| `index.html` | 이중 언어 페이지. 음성 선택기(KSS·F2·M2), 예문 8개, 빠르기·음높이 슬라이더, 합성 지표, 음소 보기 |
+| `index.html` | 이중 언어 페이지. 음성 선택기(KSS·F2·M2), 예문 25개(한국어·숫자·한영 혼용·영어 F2·영어 M2 유형당 5개, 누르면 바로 재생), 빠르기·음높이 슬라이더, 합성 지표, 음소 보기 |
 | `worker.js` | 워커. Pyodide에서 `kofront`(g2pk + dizione)로 음소화 — 음성에 따라 모드 A(`ko-loan`, KSS)·모드 B(`own`, F2/M2) 선택 — ONNX Runtime Web으로 추론 |
 | `en.html`, `worker-en.js` | 업스트림의 영어 데모 (동일 구조, F2/M2 2음성) |
 | `404.html` | Pages/Cloudflare용 안내 페이지 |
