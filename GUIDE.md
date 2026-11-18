@@ -108,7 +108,7 @@ sentences).
 | Model | `model.onnx` (21.4 MB), exported from `runs/v2/inference.pt` under `TINY_VOCA_FRONTEND=ko-loan` |
 | Phonemizer | `pyfront.zip` ← g2pK + jamo + `kofront` (the same `vocab/text/korean.py`) + dizione |
 | Morphology | `mecab-dict.json` ← 20 649 corpus eojeols with their real MeCab analyses |
-| Measured in Chrome | published site: 4.7 s of audio in 0.28 s (16.9× real time); locally 3.6 s in 0.37 s (9.7× real time), phonemization 186 ms |
+| Measured in Chrome | published site (v2, 2026-11-18): numbers 4.4 s of audio in 0.28 s (15.7× real time), code-mixed 3.5 s in 0.21 s (16.2×), English (F2) 4.1 s in 0.35 s (11.9×), phonemization 33–149 ms, 0 page errors |
 | First visit | ~40 MB, then from Cache Storage |
 
 ## 4. Re-run the gates

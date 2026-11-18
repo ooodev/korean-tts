@@ -19,9 +19,9 @@ upstream `n4ze3m/tiny-voca` dataset (F2/M2).
 | Corpus | KSS 12 210/322/322 clips (8.45 h) + n4ze3m EN 7 976/702/576 clips; merged manifest **16 451 / 933 / 802** |
 | Aligners | `wav2vec2-large-xlsr-korean` CTC (KSS, reusing v1's `annotations_full`) + `wav2vec2-lv-60-espeak-cv-ft` CTC (F2/M2, `own` front end) |
 | Model | **4 550 347** parameters, 3 speakers (`KSS`, `F2`, `M2`), **160 000 steps** from scratch (GAN from 8 000) on an RTX 4090 in **12 h 22 m** (4 resumable ≤4 h chunks, 0 failures) |
-| Gates | KO CER ≤ 12.5 % (v1: 11.8 %) at the KSS rows, EN WER ≤ 1.5 % with `small.en` at the F2/M2 rows; decision gates at 80k/120k both passed (KO 6.01 % → 5.67 %, EN 0.90 % → 0.79 %) <!-- PUBLISH: final gate numbers --> |
-| Batteries | 20-case number battery + 20-word loanword battery (P1 golden tables) + 16-case Mode A+B listening set <!-- PUBLISH: results --> |
-| Browser demo | voice `<select>` (3 voices), voice=mode routing, 8 example chips; ONNX + Pyodide in the page <!-- PUBLISH: published-site measurement --> |
+| Gates | KO CER ≤ 12.5 % (v1: 11.8 %) at the KSS rows, EN WER ≤ 1.5 % with `small.en` at the F2/M2 rows; decision gates at 80k/120k both passed (KO 6.01 % → 5.67 %, EN 0.90 % → 0.79 %); **final PASS: KO CER 5.35 %, EN WER 0.80 %** (0 frontend token mismatches) |
+| Batteries | 39-case battery (19 numbers + 20 loanwords, P1 golden tables) + 16-case Mode A+B listening set; text level **39/39 OK**, ASR proxy 58.9 % CER (digit-bias proxy, not the spec gate), listening 16/16 wavs OK |
+| Browser demo | voice `<select>` (3 voices), voice=mode routing, 8 example chips; ONNX + Pyodide in the page — published site measured 2026-11-18: 0 page errors, first-visit load 6.5 s, numbers 4.4 s in 0.28 s (15.7× real time), code-mixed 3.5 s in 0.21 s (16.2×), English (F2) 4.1 s in 0.35 s (11.9×), phonemization 33–149 ms; loanword dictionary confirmed live (Python → 파이썬) |
 
 ## 1. Serving modes (one checkpoint, two front ends)
 
@@ -189,7 +189,22 @@ KSS (`a1_greeting`…`a8_numbers_units`) + 8 Mode B F2/M2
   **92.64 %** identical token streams (gate ≥ 90 %), token accuracy
   **99.80 %** (34 tokens differ; the `python-mecab-ko`-only assimilation rules).
 
-<!-- PUBLISH: published-site measurement + live URL -->
+**Published site** (https://ooodev.github.io/korean-tts/, headless-Chrome
+measurement, 2026-11-18, VERSION 4): 0 page errors, first-visit load 6.5 s, then
+from Cache Storage. Per chip (status `완료.`, audio element filled):
+
+| chip | voice / mode | audio | synth wall | real time | phonemization |
+| --- | --- | --- | --- | --- | --- |
+| 숫자 | KSS / A | 4.4 s | 0.28 s | 15.7× | 33 ms |
+| 한영 혼용 | KSS / A | 3.5 s | 0.21 s | 16.2× | 64 ms |
+| 영어 | F2 / B | 4.1 s | 0.35 s | 11.9× | 149 ms |
+
+`Python` renders `파ᅵ썬ᅳ로` — the trained dictionary spelling (파이썬), not the
+OOV fallback. Two publish-blocking bugs were found and fixed during
+measurement (VERSION 3/4): `kofront/loanwords.py` and
+`kofront/data/loanwords.tsv` were missing from `pyfront.zip`, so code-mixed
+input crashed the worker or fell back off the training distribution; see
+WORKLOG 2026-11-18.
 
 ## 9. Reproducing
 

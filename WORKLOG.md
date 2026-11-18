@@ -1491,3 +1491,88 @@ EN 0.90 % → 0.79 % → 0.80 % (flat at the bottom).
 Push → Pages build → published-site measurement (fill the last PUBLISH
 markers in README/GUIDE/FINAL_REPORT) → final commit.
 
+## 2026-11-18 ≈18:05 — Incident: published page dead (worker.js encoding corruption)
+
+The post-push Pages verification failed: headless Chrome measured the published
+site, but the page never reached `준비 완료` — `#status` stuck at
+`작동 중: Uncaught SyntaxError: Invalid or unexpected token` (a probe that logs
+page/worker console showed the error at +0 s, before any asset download).
+
+**Root cause.** `scripts/publish_v2_demo.ps1` step 4/6 bumped VERSION in
+`worker.js` with `Get-Content -Raw` / `WriteAllText`. PS 5.1 reads a BOM-less
+UTF-8 file with the ANSI codepage (CP949 on this machine), so every Korean
+status string in `worker.js` (11 lines) came back mojibake, and a byte sequence
+that maps to nothing in CP949 became `?` — the corrupted `?` then unbalanced a
+string literal → SyntaxError. The publish run's own stderr (export
+DeprecationWarning) had already shown the pipeline was shuffling the file
+through native encodings; the corruption shipped in `843d62f` and stayed on the
+site for ~30 min until the measurement caught it.
+
+**Fix (commit `a07e2dc`).**
+- Restored `worker.js` from `c88719a` (the last intact version), re-applied the
+  VERSION 1 → 2 bump with Python (byte-exact), verified the diff against
+  `c88719a` is exactly one line, and node-`vm` syntax-checked the result.
+- `publish_v2_demo.ps1` now reads with
+  `[System.IO.File]::ReadAllText(path, [System.Text.Encoding]::UTF8)` and keeps
+  the BOM-less UTF-8 write; the exact bug is noted in a comment.
+- Deployed build verified over HTTP: VERSION 2, zero mojibake fingerprints,
+  Korean status strings intact.
+
+**Bonus damage found while scanning: GUIDE.md.** The fingerprint scan for the
+worker bug surfaced ~35 corrupted lines in `GUIDE.md` — pre-existing since
+`d3c077d` ("Document the browser demo across the docs", the v1-era commit that
+rewrote the file through the same PS 5.1 ANSI pipe). It had mangled every
+Korean sentence in the deliverables tree and ASR table, the `--text` example,
+the phonology notes, and arrow/dash glyphs (`←` `→` `—` `…` `–` `≈` `×` →
+`?`/`??`), plus a BOM at byte 0. Repaired all ~50 lines from intact sources:
+`e624b81:GUIDE.md` (pre-corruption), `samples/manifest.json` (the 7 sample
+texts), `scripts/make_guide.py` (same content as `guide.html`), and the
+`README.md`/`guide.html` copy of the `--text` sentence. Verified: zero
+fingerprint hits remain, every repaired line read back clean.
+
+### Second incident: pyfront.zip missing front-end data (code-mixed chip crash, then OOV fallback)
+
+Re-measuring the encoding-fixed site still failed, now on chip 2 — the
+worker's catch surfaced `ModuleNotFoundError: No module named
+'kofront.loanwords'` on `오늘 Python으로 테스트를 진행했습니다.`
+`build_web_assets.py` shipped only `vocab/text/korean.py` as `kofront/`,
+while `korean.py:438` lazily imports `loanword_span` from `kofront.loanwords`
+for every English span inside Korean text. Pure-Korean input never takes
+that path, so nothing caught it. Fix: add `loanwords.py` to
+`FRONTEND_FILES`, rebuild, and verify the shipped zip end-to-end by
+extracting it and phonemizing all three chip sentences (both modes) from the
+extracted tree only. Commit `ddfb628`, VERSION 3.
+
+The per-chip probe then exposed a subtler gap: the browser rendered `Python`
+as `바ᅵ산ᅳ로` (OOV IPA→jamo fallback) while the trained front end renders
+the dictionary spelling `파ᅵ썬ᅳ로` (파이썬; `python\t파이썬` in
+`data/loanwords.tsv`). `loanwords.py` resolves its dictionary relative to
+`__file__` (`kofront/data/loanwords.tsv`), which the zip never shipped — so
+every code-mixed English word in the browser fell back to the OOV engine,
+off the training distribution. Fix: ship `kofront/data/loanwords.tsv`
+(462 entries); verified the extracted zip now reproduces the trained
+rendering byte-for-byte on the chip sentences. Commit `32805ef`, VERSION 4.
+
+Lesson recorded in the build script: the demo gates (`check_onnx`,
+`check_shim`) run the venv's `tiny_voca`, which silently includes both
+files; the shipped zip must be exercised end-to-end, not just the local
+package.
+
+## 2026-11-18 ≈20:00 — Published site verified; PUBLISH markers filled
+
+VERSION 4 deploy confirmed (deployed `pyfront.zip` SHA256 == local).
+Headless-Chrome measurement, 0 page errors, first-visit load 6.5 s,
+READY "준비 완료 — 스텝 160000, 음성 KSS · F2 · M2.":
+
+| chip | voice / mode | audio | synth | real time | phonemization |
+| --- | --- | --- | --- | --- | --- |
+| 숫자 | KSS / A | 4.4 s | 0.28 s | 15.7× | 33 ms |
+| 한영 혼용 | KSS / A | 3.5 s | 0.21 s | 16.2× | 64 ms |
+| 영어 | F2 / B | 4.1 s | 0.35 s | 11.9× | 149 ms |
+
+Mixed chip renders `Python` as `파ᅵ썬ᅳ로` (파이썬, the dictionary spelling) —
+the `loanwords.tsv` fix is live. Filled the last PUBLISH markers in
+`tiny-voca/web/README.md` (실측 table), `GUIDE.md` (Measured-in-Chrome row) and
+`FINAL_REPORT_v2.md` (Browser-demo row + §8 Published-site block); the v1
+numbers stay as one historical line in the README. Final commit closes v2.0.
+
