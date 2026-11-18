@@ -18,7 +18,7 @@ upstream `n4ze3m/tiny-voca` dataset (F2/M2).
 | Front end | 142-token unified vocabulary (unchanged from v1); Mode A adds Korean TN + loanword G2P→Jamo before segmentation |
 | Corpus | KSS 12 210/322/322 clips (8.45 h) + n4ze3m EN 7 976/702/576 clips; merged manifest **16 451 / 933 / 802** |
 | Aligners | `wav2vec2-large-xlsr-korean` CTC (KSS, reusing v1's `annotations_full`) + `wav2vec2-lv-60-espeak-cv-ft` CTC (F2/M2, `own` front end) |
-| Model | **4 550 347** parameters, 3 speakers (`KSS`, `F2`, `M2`), **160 000 steps** from scratch (GAN from 8 000) on an RTX 4090 <!-- PUBLISH: elapsed time --> |
+| Model | **4 550 347** parameters, 3 speakers (`KSS`, `F2`, `M2`), **160 000 steps** from scratch (GAN from 8 000) on an RTX 4090 in **12 h 22 m** (4 resumable ≤4 h chunks, 0 failures) |
 | Gates | KO CER ≤ 12.5 % (v1: 11.8 %) at the KSS rows, EN WER ≤ 1.5 % with `small.en` at the F2/M2 rows; decision gates at 80k/120k both passed (KO 6.01 % → 5.67 %, EN 0.90 % → 0.79 %) <!-- PUBLISH: final gate numbers --> |
 | Batteries | 20-case number battery + 20-word loanword battery (P1 golden tables) + 16-case Mode A+B listening set <!-- PUBLISH: results --> |
 | Browser demo | voice `<select>` (3 voices), voice=mode routing, 8 example chips; ONNX + Pyodide in the page <!-- PUBLISH: published-site measurement --> |
@@ -87,7 +87,8 @@ junctions to `features2` / `features_en`.
 - Recipe unchanged from v1: batch 12 000 frames/48 utterances, warmup 1 000,
   half-life 100 000, GAN 8 000/3 000/0.7, teacher 3 000/7 000/0, 4-hour
   resumable chunks.
-- Post-GAN throughput **≈ 3.7 steps/s** (v1: 3.2). <!-- PUBLISH: final elapsed time, step-verified -->
+- Post-GAN throughput **≈ 3.5 steps/s** (v1: 3.2), step-verified: 160 000 steps
+  in 3 × 4 h + 20 min of chunk time (attempts 1–4, no failures).
 
 ## 6. Evaluation
 
