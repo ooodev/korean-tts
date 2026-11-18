@@ -26,7 +26,7 @@ let pyodide, phonemize, session, config;
 const status = (text, progress) => postMessage({ type: "status", text, progress });
 
 // Bump when the files under assets/ change, so browsers fetch them again.
-const VERSION = "3";
+const VERSION = "4";
 
 // Downloaded files are kept in the browser's cache storage: a second visit starts without the network.
 async function download(url, label) {

@@ -64,6 +64,12 @@ def zip_kofront(target: Path) -> int:
         for name in FRONTEND_FILES:
             archive.write(source / name, f"kofront/{name}")
             count += 1
+        # loanwords.py resolves its dictionary relative to __file__
+        # (kofront/data/loanwords.tsv); without it every English span in a
+        # Korean sentence falls back to the OOV IPA engine and the shipped
+        # voice pronounces loanwords the way it was never trained to.
+        archive.write(source / "data" / "loanwords.tsv", "kofront/data/loanwords.tsv")
+        count += 1
         archive.write(ROOT / "scripts" / "mecab_shim.py", "mecab.py")     # python-mecab-ko stand-in
         count += 1
     return count
