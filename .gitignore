@@ -54,7 +54,8 @@ data_en/
 data_en_smoke/
 features_en/
 features_en_smoke/
-features_mixed/     # junctions into features2/ + features_en/
+# junctions into features2/ + features_en/
+features_mixed/
 logs_en_parts/
 logs_en_parts3/
 samples_smoke_v2/

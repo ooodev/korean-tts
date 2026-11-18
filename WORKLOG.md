@@ -1576,3 +1576,12 @@ the `loanwords.tsv` fix is live. Filled the last PUBLISH markers in
 `FINAL_REPORT_v2.md` (Browser-demo row + §8 Published-site block); the v1
 numbers stay as one historical line in the README. Final commit closes v2.0.
 
+## 2026-11-18 ≈20:30 — .gitignore: inline comment broke features_mixed/
+
+`git status` kept showing `?? features_mixed/` even though the directory was
+listed for ignoring. Root cause: the entry was written with an inline comment
+(`features_mixed/     # junctions into features2/ + features_en/`) and git
+ignore patterns have no inline `#` — the whole line, comment included, became
+the pattern and matched nothing. Fix: comment moved to its own line; the
+v2 feature dirs are now in AGENTS.md's not-committed list too.
+
